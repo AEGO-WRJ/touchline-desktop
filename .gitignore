@@ -13,8 +13,16 @@ favorites.json
 favorites.json.bak
 *.tmp
 cache/
+badges/
 data/
 config/
 .env
 .env.*
 *.log
+
+# Development checks are kept locally, outside this runtime repository
+*Tests.cs
+Tests.cs
+test*.ps1
+fixture*.json
+.github/

@@ -20,6 +20,13 @@ namespace Touchline {
    string first=favorites.TeamIds==null?null:favorites.TeamIds.FirstOrDefault();
    return String.IsNullOrEmpty(first)?null:All.FirstOrDefault(x=>x.Id==first);
   }
+  public IEnumerable<string> Logos(string id,string logo) {
+   var sources=new List<string>();if(IsLogo(logo))sources.Add(logo);
+   sources.AddRange(entries.Where(x=>x.Id==id&&IsLogo(x.Logo)).Select(x=>x.Logo));
+   if(!String.IsNullOrEmpty(id)&&id.All(c=>c>='0'&&c<='9'))sources.Add("https://a.espncdn.com/i/teamlogos/soccer/500/"+id+".png");
+   return sources.Distinct().ToArray();
+  }
+  internal static bool IsLogo(string url) {Uri uri;return Uri.TryCreate(url,UriKind.Absolute,out uri)&&uri.Scheme=="https"&&uri.Host=="a.espncdn.com";}
   void Add(string id,string name,string league,string logo) {
    if(!String.IsNullOrEmpty(id)&&!entries.Any(x=>x.Id==id&&x.League==league))entries.Add(new TeamEntry{Id=id,Name=name,League=league,Logo=logo});
   }
