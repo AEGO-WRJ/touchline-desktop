@@ -21,6 +21,7 @@ namespace Touchline {
   readonly ScoreFeed feed;
   readonly FavoriteStore favoriteStore;
   readonly BadgeStore badges;
+  readonly StartupSetting startup=new StartupSetting(Forms.Application.ExecutablePath);
   Preferences preferences=new Preferences();
   LeagueResult[] results=new LeagueResult[0];
   DateTime day=MatchData.BeijingToday;
@@ -65,6 +66,7 @@ namespace Touchline {
    Height=Math.Min(Height,area.Height-20);
    Resources=(ResourceDictionary)XamlReader.Parse(Styles);
    Build();BuildCompact();ApplyPresentation();SetupTray();
+   try{startup.RefreshPath();}catch(Exception){notice.Text="开机自启设置未能更新，请在设置中重新开启。";notice.Foreground=Amber;noticeBox.Visibility=Visibility.Visible;noticeUntil=DateTimeOffset.UtcNow.AddMinutes(2);}
    if(!String.IsNullOrEmpty(favoriteStore.Warning)){notice.Text=favoriteStore.Warning;notice.Foreground=Amber;noticeBox.Visibility=Visibility.Visible;noticeUntil=DateTimeOffset.UtcNow.AddMinutes(2);}
    timer.Interval=TimeSpan.FromSeconds(1);timer.Tick+=async (s,e)=>{
     if(day!=MatchData.BeijingToday) {day=MatchData.BeijingToday;if(rangeEnd<day.AddDays(6))rangeEnd=day.AddDays(6);due=DateTimeOffset.UtcNow;Render();}
@@ -349,9 +351,15 @@ namespace Touchline {
   }
   void ShowSettings() {
    var panel=new StackPanel{Margin=new Thickness(22)};
-   var dialog=new Window{Title="看球设置",Owner=this,Width=360,Height=430,ResizeMode=ResizeMode.NoResize,WindowStartupLocation=WindowStartupLocation.CenterOwner,Background=B("#182830"),Foreground=Ink,FontFamily=FontFamily,Content=panel,Topmost=Topmost};
+   var dialog=new Window{Title="看球设置",Owner=this,Width=360,Height=470,ResizeMode=ResizeMode.NoResize,WindowStartupLocation=WindowStartupLocation.CenterOwner,Background=B("#182830"),Foreground=Ink,FontFamily=FontFamily,Content=panel,Topmost=Topmost};
    panel.Children.Add(T("让比分留在你身边",17,Ink,true));
-   var sound=new CheckBox{Content="比分变化时播放提示音",IsChecked=preferences.Sound,Foreground=Ink,Margin=new Thickness(0,22,0,20)};sound.Checked+=(s,e)=>{preferences.Sound=true;Save();};sound.Unchecked+=(s,e)=>{preferences.Sound=false;Save();};panel.Children.Add(sound);
+   var autoStart=new CheckBox{Content="开机自启",Foreground=Ink,Margin=new Thickness(0,22,0,14),ToolTip="默认关闭；开启后登录 Windows 自动运行"};
+   try{autoStart.IsChecked=startup.Enabled;}catch(Exception ex){autoStart.IsEnabled=false;autoStart.ToolTip="无法读取自启设置："+ex.Message;}
+   autoStart.Click+=(s,e)=>{
+    bool enabled=autoStart.IsChecked==true;
+    try{startup.SetEnabled(enabled);}catch(Exception ex){autoStart.IsChecked=!enabled;MessageBox.Show(dialog,"自启设置未能保存："+ex.Message,"开机自启",MessageBoxButton.OK,MessageBoxImage.Warning);}
+   };panel.Children.Add(autoStart);
+   var sound=new CheckBox{Content="比分变化时播放提示音",IsChecked=preferences.Sound,Foreground=Ink,Margin=new Thickness(0,0,0,20)};sound.Checked+=(s,e)=>{preferences.Sound=true;Save();};sound.Unchecked+=(s,e)=>{preferences.Sound=false;Save();};panel.Children.Add(sound);
    var transparency=OpacityControls();transparency.Margin=new Thickness(0,0,0,18);panel.Children.Add(transparency);
    panel.Children.Add(T("拖动左上角标题移动卡片；拖动右下角调整大小。收起后，双击托盘图标可恢复。",11,Muted));
    panel.Children.Add(T("赛中每30秒刷新，其余每2分钟刷新。数据可能延迟，缺失项显示为“—”。",10,Muted));
