@@ -287,8 +287,14 @@ namespace Touchline {
    return badge;
   }
   async void FillBadge(Grid badge,IEnumerable<string> urls,double size) {
-   var image=await badges.Load(urls);if(image==null||exiting)return;
-   badge.Children.Clear();badge.Children.Add(new Image{Source=image,Width=size,Height=size,Stretch=Stretch.Uniform});
+   var image=await badges.Load(urls).ConfigureAwait(false);if(image==null)return;
+   // Startup can request badges before Application.Run installs a UI context.
+   try {
+    await badge.Dispatcher.InvokeAsync(()=>{
+     if(exiting)return;
+     badge.Children.Clear();badge.Children.Add(new Image{Source=image,Width=size,Height=size,Stretch=Stretch.Uniform});
+    }).Task.ConfigureAwait(false);
+   }catch(System.Threading.Tasks.TaskCanceledException){} // Dispatcher is shutting down.
   }
   FrameworkElement Team(string name,string logo,string id) {
    var s=new StackPanel{VerticalAlignment=VerticalAlignment.Center};
