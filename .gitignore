@@ -1,0 +1,20 @@
+# Local builds
+dist/
+bin/
+obj/
+.vs/
+*.exe
+*.dll
+*.pdb
+
+# Personal settings and match cache must stay on the user's computer
+settings.json
+favorites.json
+favorites.json.bak
+*.tmp
+cache/
+data/
+config/
+.env
+.env.*
+*.log
