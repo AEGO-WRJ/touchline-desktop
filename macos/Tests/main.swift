@@ -101,6 +101,10 @@ func runTests() async throws {
     check(store.load().0.favorites == preferences.favorites && store.load().1 != nil, "Damaged primary restores backup with notice")
     let sparse = try JSONDecoder().decode(Preferences.self, from: Data("{\"favorites\":[\"359\",\"359\"],\"opacity\":5,\"width\":-10}".utf8))
     check(sparse.favorites == ["359"] && sparse.opacity == 1 && sparse.width == 400, "Older settings get defaults, deduplication and bounds")
+    check(sparse.startInMenuBar, "Older settings default to menu-bar background launch")
+    preferences.startInMenuBar = false
+    try store.save(preferences)
+    check(!store.load().0.startInMenuBar, "Opting into visible startup survives restart")
 
     let config = URLSessionConfiguration.ephemeral
     config.protocolClasses = [StubProtocol.self]
@@ -121,7 +125,8 @@ func runTests() async throws {
     StubProtocol.data = Data("{}".utf8)
     let malformed = await feed.load(start: start, end: start, force: true)
     check(malformed.failed == 12 && malformed.matches.first?.stale == true, "Malformed responses do not replace valid cache")
-    print("Passed \(checks) macOS checks: dates, parsing, filters, score changes, settings and offline cache.")
+    try await runBadgeTests()
+    print("Passed \(checks) macOS checks: dates, parsing, filters, settings, score cache, badge caching/retry/concurrency and background-launch preferences.")
 }
 
 Task {

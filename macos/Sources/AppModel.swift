@@ -8,13 +8,14 @@ struct Preferences: Codable {
     var pinned = true
     var compact = false
     var sound = false
+    var startInMenuBar = true
     var opacity = 1.0
     var compactOpacity = 0.65
     var x: Double?
     var y: Double?
     var width = 420.0
     var height = 740.0
-    enum CodingKeys: String, CodingKey { case favorites, onlyFavorites, pinned, compact, sound, opacity, compactOpacity, x, y, width, height }
+    enum CodingKeys: String, CodingKey { case favorites, onlyFavorites, pinned, compact, sound, startInMenuBar, opacity, compactOpacity, x, y, width, height }
     init() {}
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -23,6 +24,7 @@ struct Preferences: Codable {
         pinned = try c.decodeIfPresent(Bool.self, forKey: .pinned) ?? true
         compact = try c.decodeIfPresent(Bool.self, forKey: .compact) ?? false
         sound = try c.decodeIfPresent(Bool.self, forKey: .sound) ?? false
+        startInMenuBar = try c.decodeIfPresent(Bool.self, forKey: .startInMenuBar) ?? true
         opacity = min(1, max(0.1, try c.decodeIfPresent(Double.self, forKey: .opacity) ?? 1))
         compactOpacity = min(1, max(0.1, try c.decodeIfPresent(Double.self, forKey: .compactOpacity) ?? 0.65))
         x = try c.decodeIfPresent(Double.self, forKey: .x)
@@ -77,10 +79,14 @@ final class AppModel: ObservableObject {
     @Published var loginEnabled = SMAppService.mainApp.status == .enabled
     @Published var loginMessage = ""
     @Published var todayScroll = UUID()
+    @Published var badgeRevision = 0
+    @Published private(set) var fullCardVisible = false
     let store: SettingsStore
     let feed: ScoreFeed
+    let badges: BadgeStore
     var presentationChanged: (() -> Void)?
     private var names: [String: String] = [:]
+    private var catalogLogos: [String: [String]] = [:]
     private var timer: Timer?
     private var refreshTask: Task<Void, Never>?
     private var tracker = ScoreTracker()
@@ -92,13 +98,16 @@ final class AppModel: ObservableObject {
     init(dataDirectory: URL? = nil, cacheDirectory: URL? = nil) {
         let fm = FileManager.default
         store = SettingsStore(directory: dataDirectory ?? fm.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("TouchlineCard"))
-        feed = ScoreFeed(cache: cacheDirectory ?? fm.urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent("TouchlineCard"))
+        let cache = cacheDirectory ?? fm.urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent("TouchlineCard")
+        feed = ScoreFeed(cache: cache)
+        badges = BadgeStore(directory: cache.appendingPathComponent("badges"))
         let loaded = store.load()
         preferences = loaded.0
         warning = loaded.1
         if let url = Bundle.main.url(forResource: "teams", withExtension: "json"), let data = try? Data(contentsOf: url),
            let values = try? JSONDecoder().decode([Team].self, from: data) {
             teams = Dictionary(values.map { ($0.id, $0) }, uniquingKeysWith: { old, _ in old }).values.sorted { $0.name < $1.name }
+            for team in values { catalogLogos[team.id, default: []].append(team.logo) }
         }
         if let url = Bundle.main.url(forResource: "team-names.zh-Hans", withExtension: "json"), let data = try? Data(contentsOf: url) {
             names = (try? JSONDecoder().decode([String: String].self, from: data)) ?? [:]
@@ -106,6 +115,7 @@ final class AppModel: ObservableObject {
     }
     func name(_ value: String) -> String { names[value] ?? value }
     var primaryTeam: Team? { teams.first { $0.id == preferences.favorites.first } }
+    func badgeURLs(_ team: Team?) -> [URL] { BadgeSource.urls(team: team, catalog: team.flatMap { catalogLogos[$0.id] } ?? []) }
     var visibleMatches: [Match] {
         MatchParser.select(matches, favorites: preferences.favorites, onlyFavorites: preferences.onlyFavorites, league: league, liveOnly: liveOnly)
     }
@@ -116,28 +126,54 @@ final class AppModel: ObservableObject {
         return (0...max(0, count)).map { Beijing.adding($0, to: first) }
     }
     func begin() {
-        refresh()
-        timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+        if fullCardVisible { refresh() }
+        let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.tick() }
         }
+        RunLoop.main.add(timer, forMode: .common)
+        self.timer = timer
     }
     func stop() { timer?.invalidate(); refreshTask?.cancel(); save() }
+    func setFullCardVisible(_ visible: Bool, force: Bool = false) {
+        guard fullCardVisible != visible else {
+            if visible && force { refresh(force: true) }
+            return
+        }
+        fullCardVisible = visible
+        if visible {
+            advanceDay()
+            nextRefresh = .distantPast
+            refresh(force: force)
+        } else {
+            refreshTask?.cancel()
+            refreshTask = nil
+            loading = false
+            pendingForce = false
+            footer = "已暂停刷新 · 展开完整卡片后同步"
+        }
+    }
     func tick() {
         if notice != nil && Date() > noticeExpires { notice = nil }
+        guard fullCardVisible else { return }
+        advanceDay()
+        if !loading && Date() >= nextRefresh { refresh() }
+    }
+    private func advanceDay() {
         let today = Beijing.day()
         if today != lastDay {
             if start == lastDay { start = today; end = Beijing.adding(6, to: today) }
             lastDay = today
             nextRefresh = .distantPast
         }
-        if !loading && Date() >= nextRefresh { refresh() }
     }
     func refresh(force: Bool = false) {
+        guard fullCardVisible else { return }
         if loading { pendingForce = pendingForce || force; return }
         loading = true
         footer = "正在同步赛程与比分…"
         let requestedStart = start, requestedEnd = end
         refreshTask = Task { [weak self, feed] in
+            if force { await self?.badges.clearFailureCooldown() }
             let result = await feed.load(start: requestedStart, end: requestedEnd, force: force)
             guard let self, !Task.isCancelled else { return }
             if self.start == requestedStart && self.end == requestedEnd {
@@ -158,6 +194,7 @@ final class AppModel: ObservableObject {
                 }
             }
             self.loading = false
+            self.badgeRevision += 1
             self.nextRefresh = Date().addingTimeInterval(self.matches.contains { $0.state == "in" } ? 30 : 120)
             let again = self.start != requestedStart || self.end != requestedEnd || self.pendingForce
             let forceAgain = self.pendingForce

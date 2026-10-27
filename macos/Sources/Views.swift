@@ -20,21 +20,27 @@ struct DragArea: NSViewRepresentable {
 }
 
 struct Badge: View {
+    @EnvironmentObject private var model: AppModel
+    @ViewState private var bitmap: NSImage?
     let team: Team?
     var size: CGFloat = 25
-    private var logoURL: URL? {
-        guard let team else { return nil }
-        if let url = URL(string: team.logo), url.scheme == "https", url.host == "a.espncdn.com" { return url }
-        guard !team.id.isEmpty, team.id.allSatisfy({ $0.isASCII && $0.isNumber }) else { return nil }
-        return URL(string: "https://a.espncdn.com/i/teamlogos/soccer/500/\(team.id).png")
-    }
+    private struct Request: Equatable { let urls: [URL]; let revision: Int }
     var body: some View {
-        AsyncImage(url: logoURL) { phase in
-            if let image = phase.image { image.resizable().scaledToFit() }
+        let request = Request(urls: model.badgeURLs(team), revision: model.badgeRevision)
+        Group {
+            if let bitmap { Image(nsImage: bitmap).resizable().scaledToFit() }
             else { Image(systemName: "soccerball").resizable().scaledToFit().foregroundColor(green) }
         }
         .frame(width: size, height: size)
         .accessibilityHidden(true)
+        .task(id: request) {
+            let cached = await model.badges.cached(request.urls)
+            guard !Task.isCancelled else { return }
+            bitmap = cached.flatMap(NSImage.init(data:))
+            let loaded = await model.badges.load(request.urls)
+            guard !Task.isCancelled else { return }
+            if let loaded { bitmap = NSImage(data: loaded) }
+        }
     }
 }
 
@@ -70,7 +76,7 @@ struct CardView: View {
         HStack(spacing: 8) {
             HStack(spacing: 8) {
                 Badge(team: model.primaryTeam, size: 20)
-                Text(model.liveCount > 0 ? "\(model.liveCount) 场进行中" : "看球").font(.system(size: 11, weight: .semibold))
+                Text("看球 · 已暂停刷新").font(.system(size: 11, weight: .semibold))
                 Spacer(minLength: 0)
             }.overlay(DragArea()).help("拖动移动卡片")
             Button { showOpacity.toggle() } label: { Image(systemName: "circle.lefthalf.filled") }
@@ -98,7 +104,7 @@ struct CardView: View {
                     .buttonStyle(CardButton(active: model.preferences.pinned)).help("切换窗口置顶")
                 Button("收纳") { model.preferences.compact = true }.buttonStyle(CardButton())
                 Button(action: hide) { Image(systemName: "minus") }.buttonStyle(CardButton()).help("隐藏到菜单栏")
-                Button { NSApp.terminate(nil) } label: { Image(systemName: "xmark") }.buttonStyle(CardButton()).help("退出看球")
+                Button(action: hide) { Image(systemName: "xmark") }.buttonStyle(CardButton()).help("关闭卡片，继续在菜单栏运行")
             }
             HStack {
                 Button("今天", action: model.today).buttonStyle(CardButton(active: true))
@@ -322,6 +328,9 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 18) {
             HStack { Text("设置").font(.title2.bold()); Spacer(); Button("完成") { dismiss() } }
             Toggle("窗口置顶", isOn: $model.preferences.pinned)
+            Toggle("启动时仅显示菜单栏图标", isOn: $model.preferences.startInMenuBar)
+            Text("收纳或关闭卡片后暂停比分刷新。点击顶部图标重新展开完整卡片后同步；退出请使用菜单中的“退出看球”。")
+                .font(.caption).foregroundColor(muted)
             Toggle("比分变化时播放提示音", isOn: $model.preferences.sound)
             VStack(alignment: .leading) {
                 Text("卡片不透明度 \(Int(model.preferences.opacity * 100))%")
@@ -338,7 +347,7 @@ struct SettingsView: View {
             Button("打开系统登录项设置") { SMAppService.openSystemSettingsLoginItems() }
             Divider()
             Button("打开本地设置文件夹") { NSWorkspace.shared.open(model.store.directory) }
-            Text("看球 · Touchline for macOS\n赛中每 30 秒、其余每 2 分钟检查。\n日期和时间统一按北京时间显示。").font(.caption).foregroundColor(muted)
+            Text("看球 · Touchline for macOS\n完整卡片显示时：赛中每 30 秒、其余每 2 分钟更新。\n日期和时间统一按北京时间显示。").font(.caption).foregroundColor(muted)
         }.font(.system(size: 12)).padding(22).frame(width: 330).background(shell).foregroundColor(ink)
             .onAppear { model.updateLoginStatus() }
     }
