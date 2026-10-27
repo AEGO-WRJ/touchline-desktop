@@ -3,6 +3,8 @@ dist/
 bin/
 obj/
 .vs/
+.DS_Store
+macos/.build/
 *.exe
 *.dll
 *.pdb
