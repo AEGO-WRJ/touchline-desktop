@@ -7,9 +7,9 @@ Windows / macOS 桌面足球卡片，支持五大联赛和欧冠。
 | 平台 | 下载 | 运行要求 |
 | --- | --- | --- |
 | Windows | [Windows 稳定版](https://github.com/AEGO-WRJ/touchline-desktop/releases/latest) → `Touchline.exe` | Windows 10/11 |
-| macOS | [macOS 预览版](https://github.com/AEGO-WRJ/touchline-desktop/releases/tag/v1.3.1-macos.1) → `Touchline-macOS-universal.zip` | macOS 13 Ventura 或更新；Apple Silicon / Intel 通用包 |
+| macOS | [macOS 预览版](https://github.com/AEGO-WRJ/touchline-desktop/releases/tag/v1.3.2-macos.1) → `Touchline-macOS-universal.zip` | macOS 13 Ventura 或更新；Apple Silicon / Intel 通用包 |
 
-Windows 双击 `Touchline.exe` 运行。Mac 解压后将 `Touchline.app` 拖入“应用程序”，双击打开。升级前先退出旧版，再替换应用，个人设置保存在应用之外。
+Windows 双击 `Touchline.exe` 运行。Mac 解压后将 `Touchline.app` 拖入“应用程序”，双击打开。1.3.1 及更早 Mac 版本需先退出旧版，手动替换一次；从 1.3.2 开始支持应用内更新，个人设置保存在应用之外。
 
 Mac 预览版使用本地 ad-hoc 签名，尚未使用 Developer ID 签名或通过 Apple 公证。首次打开可能被系统拦截；确认来自本仓库后，可按 [Apple 官方说明](https://support.apple.com/zh-cn/102445)在“系统设置 → 隐私与安全性”中允许打开，也可以自行构建。
 
@@ -36,10 +36,21 @@ Mac 版使用 SwiftUI / AppKit 原生界面，无需安装 .NET、Python、Node.
 - `−`、`×` 和 `⌘W` 均隐藏卡片，应用保留在菜单栏，暂停比分刷新；完全退出请使用菜单栏中的“退出看球”或 `⌘Q`。
 - 顶部图标使用首位关注球队的队徽，未关注时显示足球。完整卡片显示且有进行中的比赛时，旁边显示场数；暂停刷新后隐藏场数，避免把旧比分当作实时数据。统计遵循卡片当前赛程范围和筛选条件。
 - 菜单栏可直接展开/收纳、切换置顶、管理关注球队、刷新比分与队徽、修改启动方式和打开设置。
+- 菜单栏和设置均提供“检查更新”；设置中可开关自动检查、自动下载安装。
 - 应用激活时，`⌘1` 显示卡片、`⌘R` 刷新、`⌘,` 打开设置、`⌘Q` 退出。
 - 先把应用放到固定位置，再开启“登录 Mac 时自动启动”。若系统要求批准，进入“系统设置 → 通用 → 登录项”允许；移动应用后请关闭再开启自启。
 
-Mac 版支持跨桌面显示；全屏应用与台前调度中的层级仍受 macOS 管理。后台运行与登录自启是两个独立设置，登录自启仍默认关闭。Mac 睡眠期间不刷新，唤醒后重新同步。
+Mac 版支持跨桌面显示；全屏应用与台前调度中的层级仍受 macOS 管理。后台运行与登录自启是两个独立设置，登录自启仍默认关闭。Mac 睡眠期间不刷新比分，唤醒后仅在完整卡片可见时同步。
+
+### Mac 应用更新
+
+- 顶部菜单 →“检查更新…”：发现新版后，按更新窗口提示下载、安装并重新启动，无需再手动拖动替换应用。
+- 默认开启“自动检查新版本”和“自动下载并安装更新”，每 24 小时检查一次。自动下载的更新通常在退出应用时安装；需要系统授权时会提示，不能静默完成的安装可通过“检查更新”继续。
+- 后台发现需要展示的更新时，菜单项会显示“发现新版…”，不主动抢占焦点。长期不退出时，可点该菜单查看并立即安装重启。
+- 可在设置中关闭自动下载安装；关闭自动检查后，仍可随时手动检查。更新偏好由 Sparkle 保存在应用偏好域中。
+- 应用更新与比分刷新独立。卡片收纳或隐藏后仍可检查应用版本；比分仍严格遵循下方显示条件。
+- 使用独立的 macOS 更新源，不会下载 Windows 的 `Touchline.exe`。更新源和安装包均经 Ed25519 签名验证，验证失败不会安装。网络失败保留当前版本，可稍后重试。
+- 使用 [Sparkle](https://sparkle-project.org/) 2.10.1。应用内更新签名不等于 Apple 公证；当前预览版的首次安装说明仍适用。收藏、设置、队徽缓存保存在应用包之外，更新后保留。
 
 ### Mac 比分更新时机
 
@@ -90,9 +101,18 @@ Mac 版支持跨桌面显示；全屏应用与台前调度中的层级仍受 mac
 ./build-macos.sh x86_64     # 仅 Intel
 ```
 
-生成 `dist/Touchline.app` 和 `dist/Touchline-macOS-<架构>.zip`。无需下载第三方依赖。脚本优先使用独立 Command Line Tools；也支持通过 `DEVELOPER_DIR`、`SDKROOT` 指定开发工具和 SDK。
+生成 `dist/Touchline.app` 和 `dist/Touchline-macOS-<架构>.zip`。首次构建会下载固定版本的 Sparkle 2.10.1 并校验 SHA-256，后续复用 `macos/.build` 缓存；网络代理可使用 curl 的 `HTTPS_PROXY` 环境变量。框架与许可随应用一起打包，使用者无需额外安装。脚本优先使用独立 Command Line Tools；也支持通过 `DEVELOPER_DIR`、`SDKROOT` 指定开发工具和 SDK。
 
 默认采用 ad-hoc 签名。开发者可设置 `SIGN_IDENTITY` 使用自己的 Developer ID 证书签名；公证和 stapling 需另行完成，构建脚本不会申请证书或代办公证。
+
+#### 发布 Mac 自动更新
+
+1. 同时提高 `macos/Info.plist` 中展示版本和数字构建版本，更新 README，然后运行 `./build-macos.sh` 生成最终通用包。
+2. 运行 `./release-macos-update.sh v版本号-macos.1`，为最终 ZIP 签名并生成签名后的 `macos/appcast.xml`。签名工具使用登录钥匙串中账号 `com.aegowrj.touchline` 的更新专用密钥；仓库和应用仅包含公钥。密钥应安全备份、持续使用，不能随意重新生成或提交私钥。
+3. 将**签名时的原始 ZIP**上传为对应 GitHub Release 的 `Touchline-macOS-universal.zip` 并公开该 Release，然后再将签名后的 `macos/appcast.xml` 发布到 `main`。更新源固定为此文件的 HTTPS raw 地址，与 GitHub 的 Windows latest Release 分离。
+4. 签名后不要重打包 ZIP，也不要修改 appcast 的空白或内容；任何改动都必须重新签名。新构建仍需包含相同公钥、更新源和更新组件，才能继续接收后续更新。
+
+自行构建或派生项目发布更新时，应配置自己的更新源与独立密钥。没有此项目发布私钥的构建者不能向官方用户发布自动更新。
 
 ### 验证
 

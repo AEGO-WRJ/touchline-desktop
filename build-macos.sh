@@ -21,6 +21,7 @@ if ! xcrun --find swiftc >/dev/null 2>&1; then
     exit 1
 fi
 sdk="${SDKROOT:-$(xcrun --sdk macosx --show-sdk-path)}"
+sparkle="$(bash macos/prepare-sparkle.sh)"
 build="$PWD/macos/.build"
 bundle="$PWD/dist/Touchline.app"
 mkdir -p "$build" "$bundle/Contents/MacOS" "$bundle/Contents/Resources"
@@ -28,6 +29,7 @@ binaries=()
 for arch in "${architectures[@]}"; do
     binary="$build/Touchline-$arch"
     xcrun swiftc -swift-version 5 -O -sdk "$sdk" -target "$arch-apple-macosx13.0" \
+        -F "$sparkle" -framework Sparkle -Xlinker -rpath -Xlinker @executable_path/../Frameworks \
         macos/Sources/*.swift -o "$binary"
     binaries+=("$binary")
 done
@@ -39,12 +41,22 @@ fi
 cp macos/Info.plist "$bundle/Contents/Info.plist"
 cp assets/teams.json assets/team-names.zh-Hans.json "$bundle/Contents/Resources/"
 cp macos/Touchline.icns "$bundle/Contents/Resources/Touchline.icns"
+mkdir -p "$bundle/Contents/Frameworks"
+rm -rf "$bundle/Contents/Frameworks/Sparkle.framework"
+ditto "$sparkle/Sparkle.framework" "$bundle/Contents/Frameworks/Sparkle.framework"
+cp "$sparkle/LICENSE" "$bundle/Contents/Resources/Sparkle-LICENSE"
+framework="$bundle/Contents/Frameworks/Sparkle.framework"
 if [[ -n "${SIGN_IDENTITY:-}" ]]; then
+    # Sign nested code from the inside out; do not use --deep for signing.
+    for component in XPCServices/Installer.xpc XPCServices/Downloader.xpc Autoupdate Updater.app; do
+        codesign --force --options runtime --timestamp --preserve-metadata=entitlements --sign "$SIGN_IDENTITY" "$framework/Versions/B/$component"
+    done
+    codesign --force --options runtime --timestamp --sign "$SIGN_IDENTITY" "$framework"
     codesign --force --options runtime --timestamp --sign "$SIGN_IDENTITY" "$bundle"
 else
     codesign --force --timestamp=none --sign - "$bundle"
 fi
-codesign --verify --strict "$bundle"
+codesign --verify --deep --strict "$bundle"
 archive="$PWD/dist/Touchline-macOS-$architecture.zip"
 # ditto replaces the archive; no user data is stored inside the app bundle.
 ditto -c -k --sequesterRsrc --keepParent "$bundle" "$archive"

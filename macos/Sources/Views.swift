@@ -323,10 +323,13 @@ struct FavoritesView: View {
 
 struct SettingsView: View {
     @ObservedObject var model: AppModel
+    @EnvironmentObject private var updates: AppUpdater
     @Environment(\.dismiss) private var dismiss
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             HStack { Text("设置").font(.title2.bold()); Spacer(); Button("完成") { dismiss() } }
+            ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
             Toggle("窗口置顶", isOn: $model.preferences.pinned)
             Toggle("启动时仅显示菜单栏图标", isOn: $model.preferences.startInMenuBar)
             Text("收纳或关闭卡片后暂停比分刷新。点击顶部图标重新展开完整卡片后同步；退出请使用菜单中的“退出看球”。")
@@ -346,9 +349,24 @@ struct SettingsView: View {
             if !model.loginMessage.isEmpty { Text(model.loginMessage).font(.caption).foregroundColor(.orange) }
             Button("打开系统登录项设置") { SMAppService.openSystemSettingsLoginItems() }
             Divider()
+            HStack {
+                Text("当前版本 \(updates.version)")
+                Spacer()
+                Button("检查更新…") { updates.check() }.disabled(!updates.canCheck)
+            }
+            Toggle("自动检查新版本", isOn: Binding(get: { updates.automaticChecks }, set: updates.setAutomaticChecks))
+            Toggle("自动下载并安装更新", isOn: Binding(get: { updates.automaticDownloads }, set: updates.setAutomaticDownloads))
+                .disabled(!updates.automaticChecks)
+            Text("每天检查一次。开启自动安装后，更新下载完成会在退出时安装；也可检查更新并立即安装重启。此设置独立于比分刷新。").font(.caption).foregroundColor(muted)
+            if let version = updates.pendingVersion {
+                Button("发现新版 \(version)，查看更新…") { updates.check() }.disabled(!updates.canCheck)
+            }
+            Divider()
             Button("打开本地设置文件夹") { NSWorkspace.shared.open(model.store.directory) }
             Text("看球 · Touchline for macOS\n完整卡片显示时：赛中每 30 秒、其余每 2 分钟更新。\n日期和时间统一按北京时间显示。").font(.caption).foregroundColor(muted)
-        }.font(.system(size: 12)).padding(22).frame(width: 330).background(shell).foregroundColor(ink)
+            }.frame(maxWidth: .infinity, alignment: .leading)
+            }.frame(maxHeight: 560)
+        }.font(.system(size: 12)).padding(22).frame(width: 360).background(shell).foregroundColor(ink)
             .onAppear { model.updateLoginStatus() }
     }
 }

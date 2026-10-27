@@ -14,6 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     private var lastCompact: Bool?
     private var applyingFrame = false
     private var model: AppModel!
+    private let updates = AppUpdater()
     private var observation: AnyCancellable?
     private var badgeTask: Task<Void, Never>?
     private var badgeKey = ""
@@ -23,6 +24,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     private var pinItem: NSMenuItem!
     private var refreshItem: NSMenuItem!
     private var summaryItem: NSMenuItem!
+    private var updateItem: NSMenuItem!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // An isolated data directory is useful for development smoke checks.
@@ -36,9 +38,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         window.hasShadow = true
         window.appearance = NSAppearance(named: .darkAqua)
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        window.contentView = NSHostingView(rootView: CardView(model: model, hide: { [weak self] in self?.hideCard() }).environmentObject(model))
+        window.contentView = NSHostingView(rootView: CardView(model: model, hide: { [weak self] in self?.hideCard() }).environmentObject(model).environmentObject(updates))
         window.delegate = self
         model.presentationChanged = { [weak self] in self?.applyPresentation() }
+        updates.willPresent = { [weak self] in self?.hideCard() }
         applyPresentation()
         let area = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
         let p = model.preferences
@@ -53,6 +56,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         if !model.preferences.startInMenuBar { showCard() }
         else { model.footer = "已暂停刷新 · 展开完整卡片后同步" }
         model.begin()
+        updates.start()
     }
     private func setupMenus() {
         let appMenu = NSMenu()
@@ -64,6 +68,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         appMenu.addItem(item("隐藏卡片", #selector(hideCard), "w"))
         appMenu.addItem(item("刷新比分", #selector(refresh), "r"))
         appMenu.addItem(item("设置…", #selector(settings), ","))
+        appMenu.addItem(item("检查更新…", #selector(checkForUpdates)))
         appMenu.addItem(.separator())
         appMenu.addItem(item("退出看球", #selector(quit), "q"))
         let editRoot = NSMenuItem(title: "编辑", action: nil, keyEquivalent: "")
@@ -97,6 +102,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         startupItem = item("启动时仅显示菜单栏图标", #selector(toggleStartup))
         menu.addItem(startupItem)
         menu.addItem(item("设置…", #selector(settings)))
+        updateItem = item("检查更新…", #selector(checkForUpdates))
+        menu.addItem(updateItem)
         menu.addItem(.separator())
         menu.addItem(item("退出看球", #selector(quit)))
         statusItem.menu = menu
@@ -106,6 +113,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         startupItem.state = model.preferences.startInMenuBar ? .on : .off
         pinItem.state = model.preferences.pinned ? .on : .off
         refreshItem.isEnabled = !model.loading
+        updateItem.title = updates.menuTitle
+        updateItem.isEnabled = updates.canCheck
         summaryItem.title = !model.fullCardVisible ? "已暂停刷新 · 展开完整卡片后同步" : model.loading ? "正在同步比分…" : "当前赛程 \(model.liveCount) 场进行中 · \(model.footer)"
     }
     private func updateStatusItem() {
@@ -203,6 +212,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     }
     @objc private func toggleCompact() { model.preferences.compact.toggle(); showCard() }
     @objc private func settings() { model.preferences.compact = false; showCard(); model.showSettings = true }
+    @objc private func checkForUpdates() { updates.check() }
     @objc private func quit() { NSApp.terminate(nil) }
     @objc private func willSleep() { model.setFullCardVisible(false) }
     @objc private func woke() { syncRefreshVisibility(); model.tick() }
