@@ -3,9 +3,14 @@ import Foundation
 struct League: Identifiable, Sendable {
     let id: String
     let name: String
-    static let all = [League(id: "eng.1", name: "英超"), League(id: "esp.1", name: "西甲"),
+    static let regular = [League(id: "eng.1", name: "英超"), League(id: "esp.1", name: "西甲"),
                       League(id: "ita.1", name: "意甲"), League(id: "ger.1", name: "德甲"),
                       League(id: "fra.1", name: "法甲"), League(id: "uefa.champions", name: "欧冠")]
+    static let cups = [League(id: "eng.fa", name: "英足总杯"), League(id: "eng.league_cup", name: "英联赛杯"),
+                       League(id: "ger.dfb_pokal", name: "德国杯"), League(id: "esp.copa_del_rey", name: "国王杯")]
+    static let all = regular + cups
+    static func isCup(_ id: String) -> Bool { cups.contains { $0.id == id } }
+    static func enabled(showCups: Bool) -> [League] { showCups ? all : regular }
     static func name(_ id: String) -> String { all.first { $0.id == id }?.name ?? id }
 }
 
@@ -141,8 +146,8 @@ enum MatchParser {
             return (old.updated ?? .distantPast) > (new.updated ?? .distantPast) ? old : new
         }).values.sorted { $0.kickoff == $1.kickoff ? $0.id < $1.id : $0.kickoff < $1.kickoff }
     }
-    static func select(_ matches: [Match], favorites: [String], onlyFavorites: Bool, league: String, liveOnly: Bool) -> [Match] {
-        unique(matches).filter { (league == "all" || $0.league == league) && (!liveOnly || $0.state == "in") && (!onlyFavorites || $0.followed(by: favorites)) }
+    static func select(_ matches: [Match], favorites: [String], onlyFavorites: Bool, league: String, liveOnly: Bool, showCups: Bool = true) -> [Match] {
+        unique(matches).filter { (showCups || !League.isCup($0.league)) && (league == "all" || $0.league == league) && (!liveOnly || $0.state == "in") && (!onlyFavorites || $0.followed(by: favorites)) }
     }
 }
 
@@ -166,9 +171,9 @@ struct ScoreFeed: Sendable {
         config.httpAdditionalHeaders = ["User-Agent": "TouchlineDesktop-macOS/1.3"]
         return URLSession(configuration: config)
     }()
-    func load(start: Date, end: Date, force: Bool) async -> FeedResult {
+    func load(start: Date, end: Date, force: Bool, showCups: Bool = false) async -> FeedResult {
         await withTaskGroup(of: FeedResult.self) { group in
-            for league in League.all {
+            for league in League.enabled(showCups: showCups) {
                 group.addTask {
                     var result = FeedResult()
                     for date in Beijing.queryDates(start: start, end: end) {

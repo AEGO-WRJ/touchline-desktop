@@ -5,6 +5,7 @@ import ServiceManagement
 struct Preferences: Codable {
     var favorites: [String] = []
     var onlyFavorites = false
+    var showCups = true
     var pinned = true
     var compact = false
     var sound = false
@@ -15,12 +16,13 @@ struct Preferences: Codable {
     var y: Double?
     var width = 420.0
     var height = 740.0
-    enum CodingKeys: String, CodingKey { case favorites, onlyFavorites, pinned, compact, sound, startInMenuBar, opacity, compactOpacity, x, y, width, height }
+    enum CodingKeys: String, CodingKey { case favorites, onlyFavorites, showCups, pinned, compact, sound, startInMenuBar, opacity, compactOpacity, x, y, width, height }
     init() {}
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         favorites = Array(NSOrderedSet(array: try c.decodeIfPresent([String].self, forKey: .favorites) ?? [])) as? [String] ?? []
         onlyFavorites = try c.decodeIfPresent(Bool.self, forKey: .onlyFavorites) ?? false
+        showCups = try c.decodeIfPresent(Bool.self, forKey: .showCups) ?? true
         pinned = try c.decodeIfPresent(Bool.self, forKey: .pinned) ?? true
         compact = try c.decodeIfPresent(Bool.self, forKey: .compact) ?? false
         sound = try c.decodeIfPresent(Bool.self, forKey: .sound) ?? false
@@ -63,7 +65,13 @@ struct SettingsStore {
 
 @MainActor
 final class AppModel: ObservableObject {
-    @Published var preferences: Preferences { didSet { save(); presentationChanged?() } }
+    @Published var preferences: Preferences {
+        didSet {
+            save()
+            if oldValue.showCups != preferences.showCups { cupVisibilityChanged() }
+            presentationChanged?()
+        }
+    }
     @Published var matches: [Match] = []
     @Published var teams: [Team] = []
     @Published var league = "all"
@@ -117,7 +125,7 @@ final class AppModel: ObservableObject {
     var primaryTeam: Team? { teams.first { $0.id == preferences.favorites.first } }
     func badgeURLs(_ team: Team?) -> [URL] { BadgeSource.urls(team: team, catalog: team.flatMap { catalogLogos[$0.id] } ?? []) }
     var visibleMatches: [Match] {
-        MatchParser.select(matches, favorites: preferences.favorites, onlyFavorites: preferences.onlyFavorites, league: league, liveOnly: liveOnly)
+        MatchParser.select(matches, favorites: preferences.favorites, onlyFavorites: preferences.onlyFavorites, league: league, liveOnly: liveOnly, showCups: preferences.showCups)
     }
     var liveCount: Int { visibleMatches.filter { $0.state == "in" }.count }
     var days: [Date] {
@@ -166,17 +174,33 @@ final class AppModel: ObservableObject {
             nextRefresh = .distantPast
         }
     }
+    private func cupVisibilityChanged() {
+        // Cancel the old selection's request so it cannot restore hidden cups.
+        refreshTask?.cancel()
+        refreshTask = nil
+        loading = false
+        pendingForce = false
+        if !preferences.showCups {
+            matches.removeAll { League.isCup($0.league) }
+            if League.isCup(league) { league = "all" }
+        }
+        tracker = ScoreTracker()
+        notice = nil
+        nextRefresh = .distantPast
+        refresh() // Still requires the full card to be visible.
+    }
     func refresh(force: Bool = false) {
         guard fullCardVisible else { return }
         if loading { pendingForce = pendingForce || force; return }
         loading = true
         footer = "正在同步赛程与比分…"
         let requestedStart = start, requestedEnd = end
+        let requestedCups = preferences.showCups
         refreshTask = Task { [weak self, feed] in
             if force { await self?.badges.clearFailureCooldown() }
-            let result = await feed.load(start: requestedStart, end: requestedEnd, force: force)
+            let result = await feed.load(start: requestedStart, end: requestedEnd, force: force, showCups: requestedCups)
             guard let self, !Task.isCancelled else { return }
-            if self.start == requestedStart && self.end == requestedEnd {
+            if self.start == requestedStart && self.end == requestedEnd && self.preferences.showCups == requestedCups {
                 self.matches = result.matches
                 var known = Dictionary(self.teams.map { ($0.id, $0) }, uniquingKeysWith: { old, _ in old })
                 for m in result.matches { known[m.home.id] = m.home; known[m.away.id] = m.away }

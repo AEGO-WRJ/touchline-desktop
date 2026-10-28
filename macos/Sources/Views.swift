@@ -119,7 +119,12 @@ struct CardView: View {
             }.buttonStyle(CardButton())
             HStack(spacing: 3) {
                 tab("all", "全部")
-                ForEach(League.all) { tab($0.id, $0.name) }
+                ForEach(League.regular) { tab($0.id, $0.name) }
+            }
+            if model.preferences.showCups {
+                HStack(spacing: 3) {
+                    ForEach(League.cups) { tab($0.id, $0.name) }
+                }
             }
             HStack {
                 Text("\(model.visibleMatches.count) 场比赛 · \(model.liveCount) 场进行中").font(.system(size: 11)).foregroundColor(muted)
@@ -128,6 +133,7 @@ struct CardView: View {
             }
             HStack {
                 Toggle("只看关注球队", isOn: $model.preferences.onlyFavorites).toggleStyle(.checkbox)
+                Toggle("显示杯赛", isOn: $model.preferences.showCups).toggleStyle(.checkbox)
                 Spacer()
                 Text("北京时间 UTC+8").foregroundColor(muted)
             }.font(.system(size: 10))
@@ -335,6 +341,8 @@ struct SettingsView: View {
             Text("收纳或关闭卡片后暂停比分刷新。点击顶部图标重新展开完整卡片后同步；退出请使用菜单中的“退出看球”。")
                 .font(.caption).foregroundColor(muted)
             Toggle("比分变化时播放提示音", isOn: $model.preferences.sound)
+            Toggle("显示杯赛", isOn: $model.preferences.showCups)
+            Text("英格兰足总杯、英格兰联赛杯、德国杯、西班牙国王杯。关闭后隐藏并停止请求这些杯赛，欧冠仍正常显示。").font(.caption).foregroundColor(muted)
             VStack(alignment: .leading) {
                 Text("卡片不透明度 \(Int(model.preferences.opacity * 100))%")
                 Slider(value: $model.preferences.opacity, in: 0.1...1)

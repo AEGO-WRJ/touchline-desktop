@@ -1,13 +1,13 @@
 # 看球 · Touchline
 
-Windows / macOS 桌面足球卡片，支持五大联赛和欧冠。
+Windows / macOS 桌面足球卡片，支持五大联赛和欧冠；Mac 版还支持英格兰、德国和西班牙的主要国内杯赛。
 
 ## 下载与运行
 
 | 平台 | 下载 | 运行要求 |
 | --- | --- | --- |
 | Windows | [Windows 稳定版](https://github.com/AEGO-WRJ/touchline-desktop/releases/latest) → `Touchline.exe` | Windows 10/11 |
-| macOS | [macOS 预览版](https://github.com/AEGO-WRJ/touchline-desktop/releases/tag/v1.3.2-macos.1) → `Touchline-macOS-universal.zip` | macOS 13 Ventura 或更新；Apple Silicon / Intel 通用包 |
+| macOS | [macOS 预览版](https://github.com/AEGO-WRJ/touchline-desktop/releases/tag/v1.3.3-macos.1) → `Touchline-macOS-universal.zip` | macOS 13 Ventura 或更新；Apple Silicon / Intel 通用包 |
 
 Windows 双击 `Touchline.exe` 运行。Mac 解压后将 `Touchline.app` 拖入“应用程序”，双击打开。1.3.1 及更早 Mac 版本需先退出旧版，手动替换一次；从 1.3.2 开始支持应用内更新，个人设置保存在应用之外。
 
@@ -58,6 +58,14 @@ Mac 版支持跨桌面显示；全屏应用与台前调度中的层级仍受 mac
 - 收纳为小条、隐藏到菜单栏或隐藏应用时立即暂停，并取消尚未完成的赛程请求。
 - 重新展开完整卡片时立即同步，再恢复定时刷新。睡眠唤醒后也遵循这一显示条件。
 - 菜单栏的“打开卡片并刷新”会先展开完整卡片，再进行手动刷新。队徽缓存与比分请求相互独立，菜单栏仍可读取本地队徽或按需补全缺失队徽。
+
+### Mac 国内杯赛
+
+- 支持英格兰足总杯、英格兰联赛杯（Carabao Cup）、德国杯（DFB-Pokal）、西班牙国王杯（Copa del Rey），与联赛赛程一起按北京时间排列。
+- 卡片筛选栏和设置中均有独立的“显示杯赛”开关，默认开启，选择会保存到本机。
+- 开启后新增一行杯赛筛选按钮，可单独查看任一杯赛；“全部”同时包含联赛、欧冠和这四项杯赛。“只看关注球队”“只看进行中”对杯赛同样有效。
+- 关闭后立即隐藏杯赛及其筛选按钮、取消旧的赛程请求，并停止后续杯赛请求；若正在筛选某项杯赛，会自动回到“全部”。欧冠不受此开关影响。
+- 重新开启后，仅在完整卡片显示时同步杯赛，收纳或隐藏状态仍暂停比分刷新。比赛是否已排期、数据是否齐全取决于 ESPN。
 
 ### Mac 队徽加载
 
