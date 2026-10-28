@@ -3,6 +3,9 @@ namespace Touchline {
  public class Preferences {
   public double Left=Double.NaN,Top=Double.NaN,Width=420,Height=740,Opacity=1,CompactOpacity=.45;
   public bool Pinned=true,Sound=false,Compact=false;
+  public bool StartInTray=true,AutoCheckUpdates=true,AutoDownloadUpdates=true;
+  public bool ShowCups=true;
+  public string LastUpdateCheck;
   public FavoriteSelection Favorites=new FavoriteSelection();
   public void SetCompact(bool compact,double width,double height) {
    if(Compact==compact)return;

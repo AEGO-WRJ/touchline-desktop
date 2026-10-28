@@ -12,6 +12,7 @@ $arguments = @(
     "/win32icon:$assets\touchline.ico"
     "/resource:$assets\touchline.ico,Touchline.Icon"
     "/resource:$assets\teams.json,Touchline.Teams"
+    "/resource:$assets\windows-update-public.xml,Touchline.UpdateKey"
 )
 $arguments += $references | ForEach-Object { "/r:$_" }
 $arguments += $sources

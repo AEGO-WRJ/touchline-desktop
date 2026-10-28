@@ -21,12 +21,18 @@ namespace Touchline {
   readonly ScoreFeed feed;
   readonly FavoriteStore favoriteStore;
   readonly BadgeStore badges;
+  readonly PreferenceStore preferenceStore;
+  readonly AppUpdater updater;
   readonly StartupSetting startup=new StartupSetting(Forms.Application.ExecutablePath);
   Preferences preferences=new Preferences();
   LeagueResult[] results=new LeagueResult[0];
   DateTime day=MatchData.BeijingToday;
   DateTime rangeStart=MatchData.BeijingToday,rangeEnd=MatchData.BeijingToday.AddDays(6);
-  bool liveOnly,loading,refreshAgain,forceNext,exiting,jumpToToday;
+  bool liveOnly,loading,refreshAgain,forceNext,exiting,jumpToToday,suspended,refreshVisible,updatingDate;
+  CancellationTokenSource refreshCancel;
+  DatePicker datePicker;
+  UniformGrid cupTabs;
+  CheckBox cupsToggle;
   readonly TeamDirectory teamDirectory=new TeamDirectory();
   string filter="all",expanded;
   ScoreTracker tracker=new ScoreTracker();
@@ -45,6 +51,11 @@ namespace Touchline {
   readonly Dictionary<string,Button> tabs=new Dictionary<string,Button>();
   readonly DispatcherTimer timer=new DispatcherTimer();
   Forms.NotifyIcon tray;
+  Forms.ToolStripMenuItem traySummary,trayVisibility,trayPin,trayStartup,trayUpdates;
+  Window updateDialog;
+  System.Drawing.Icon teamTrayIcon;
+  string trayBadgeKey;
+  int trayBadgeRequest;
   System.Drawing.Icon applicationIcon;
   static readonly Brush Ink=B("#EAF2F3"),Muted=B("#91A2A9"),Green=B("#63E7AE"),Amber=B("#F1C779");
   public CardWindow() {
@@ -53,7 +64,8 @@ namespace Touchline {
     using(var source=new System.Drawing.Icon(stream))applicationIcon=(System.Drawing.Icon)source.Clone();
     Icon=System.Windows.Interop.Imaging.CreateBitmapSourceFromHIcon(applicationIcon.Handle,Int32Rect.Empty,BitmapSizeOptions.FromWidthAndHeight(32,32));
    }
-   try { var file=Path.Combine(dataDir,"settings.json");if(File.Exists(file)) preferences=new JavaScriptSerializer().Deserialize<Preferences>(File.ReadAllText(file))??new Preferences(); } catch(Exception) {}
+   preferenceStore=new PreferenceStore(dataDir);preferences=preferenceStore.Load();
+   updater=new AppUpdater(dataDir,preferences,Save);
    favoriteStore=new FavoriteStore(dataDir);preferences.Favorites=favoriteStore.Load();
    Title="看球 · 桌面比分";FontFamily=new FontFamily("Microsoft YaHei UI, Segoe UI");FontSize=12;Foreground=Ink;
    Width=Clamp(preferences.Width,380,560);Height=Clamp(preferences.Height,440,1100);MinWidth=380;MinHeight=440;MaxWidth=560;
@@ -66,16 +78,39 @@ namespace Touchline {
    Height=Math.Min(Height,area.Height-20);
    Resources=(ResourceDictionary)XamlReader.Parse(Styles);
    Build();BuildCompact();ApplyPresentation();SetupTray();
+   updater.Changed+=UpdateTray;
    try{startup.RefreshPath();}catch(Exception){notice.Text="开机自启设置未能更新，请在设置中重新开启。";notice.Foreground=Amber;noticeBox.Visibility=Visibility.Visible;noticeUntil=DateTimeOffset.UtcNow.AddMinutes(2);}
+   if(!String.IsNullOrEmpty(preferenceStore.Warning)){notice.Text=preferenceStore.Warning;notice.Foreground=Amber;noticeBox.Visibility=Visibility.Visible;noticeUntil=DateTimeOffset.UtcNow.AddMinutes(2);}
    if(!String.IsNullOrEmpty(favoriteStore.Warning)){notice.Text=favoriteStore.Warning;notice.Foreground=Amber;noticeBox.Visibility=Visibility.Visible;noticeUntil=DateTimeOffset.UtcNow.AddMinutes(2);}
    timer.Interval=TimeSpan.FromSeconds(1);timer.Tick+=async (s,e)=>{
-    if(day!=MatchData.BeijingToday) {day=MatchData.BeijingToday;if(rangeEnd<day.AddDays(6))rangeEnd=day.AddDays(6);due=DateTimeOffset.UtcNow;Render();}
     if(noticeBox.Visibility==Visibility.Visible && DateTimeOffset.UtcNow>noticeUntil) noticeBox.Visibility=Visibility.Collapsed;
-    if(DateTimeOffset.UtcNow>=due && !loading) await Refresh();
+    if(CanRefresh){AdvanceDay();if(DateTimeOffset.UtcNow>=due&&!loading)await Refresh();}
+    if(!exiting)await updater.Tick();
    };timer.Start();
-   Loaded+=async (s,e)=>await Refresh();
+   IsVisibleChanged+=(s,e)=>SyncRefresh();
    StateChanged+=(s,e)=>{if(WindowState==WindowState.Minimized){Hide();WindowState=WindowState.Normal;}};
-   Closing+=(s,e)=>{exiting=true;Save();timer.Stop();if(tray!=null){tray.Visible=false;tray.Dispose();}if(applicationIcon!=null)applicationIcon.Dispose();};
+   Closing+=(s,e)=>{if(!exiting){e.Cancel=true;Hide();return;}Save();PauseRequests();timer.Stop();};
+   Closed+=(s,e)=>{Microsoft.Win32.SystemEvents.PowerModeChanged-=PowerChanged;if(tray!=null){tray.Visible=false;tray.Dispose();}if(teamTrayIcon!=null)teamTrayIcon.Dispose();if(applicationIcon!=null)applicationIcon.Dispose();Application.Current.Shutdown();};
+   Microsoft.Win32.SystemEvents.PowerModeChanged+=PowerChanged;
+   Application.Current.SessionEnding+=(s,e)=>{exiting=true;Save();PauseRequests();};
+   PreviewKeyDown+=(s,e)=>{if(Keyboard.Modifiers!=ModifierKeys.Control)return;if(e.Key==Key.R){OpenAndRefresh();e.Handled=true;}else if(e.Key==Key.D1){ShowCard();e.Handled=true;}else if(e.Key==Key.W){Hide();e.Handled=true;}else if(e.Key==Key.Q){Quit();e.Handled=true;}else if(e.Key==Key.OemComma){ShowSettings();e.Handled=true;}};
+  }
+  public void Start(){if(!preferences.StartInTray)ShowCard(false);else{footer.Text="已暂停刷新 · 展开完整卡片后同步";UpdateTray();}}
+  bool CanRefresh {get{return IsVisible&&!preferences.Compact&&!suspended&&!exiting&&WindowState!=WindowState.Minimized;}}
+  void AdvanceDay(){var today=MatchData.BeijingToday;if(day==today)return;if(rangeStart==day){rangeStart=today;rangeEnd=today.AddDays(6);}day=today;due=DateTimeOffset.MinValue;Render();}
+  void PauseRequests(){var active=refreshCancel;refreshCancel=null;if(active!=null)active.Cancel();loading=false;refreshAgain=false;forceNext=false;if(refreshButton!=null)refreshButton.IsEnabled=true;}
+  void SyncRefresh(bool force=false){
+   bool active=CanRefresh;
+   if(!active){refreshVisible=false;PauseRequests();if(footer!=null)footer.Text="已暂停刷新 · 展开完整卡片后同步";}
+   else if(!refreshVisible||force){refreshVisible=true;AdvanceDay();if(force)PauseRequests();due=DateTimeOffset.MinValue;RefreshSoon(force);}
+   UpdateCompact();UpdateTray();
+  }
+  void PowerChanged(object sender,Microsoft.Win32.PowerModeChangedEventArgs args){Dispatcher.BeginInvoke(new Action(()=>{if(args.Mode==Microsoft.Win32.PowerModes.Suspend){suspended=true;SyncRefresh();}else if(args.Mode==Microsoft.Win32.PowerModes.Resume){suspended=false;SyncRefresh(true);}}));}
+  void ShowCard(bool full=true){if(full)SetPresentation(false);Show();Activate();SyncRefresh();}
+  void OpenAndRefresh(){ShowCard();SyncRefresh(true);}
+  void Quit(){
+   if(updater.Ready&&preferences.AutoCheckUpdates&&preferences.AutoDownloadUpdates)try{updater.BeginInstall(false);}catch(Exception){}
+   exiting=true;Close();
   }
   static double Clamp(double x,double min,double max) { return Double.IsNaN(x)||Double.IsInfinity(x)?max:Math.Max(min,Math.Min(x,max)); }
   static Brush B(string hex) { return (Brush)new BrushConverter().ConvertFromString(hex); }
@@ -101,18 +136,22 @@ namespace Touchline {
    brand.MouseLeftButtonDown+=(s,e)=>{if(e.ButtonState==MouseButtonState.Pressed) {try{DragMove();}catch(InvalidOperationException){} }};At(header,brand,0);
    var controls=new StackPanel{Orientation=Orientation.Horizontal,VerticalAlignment=VerticalAlignment.Top};
    pinButton=Btn(Topmost?"已置顶":"置顶",()=>{Topmost=!Topmost;pinButton.Content=Topmost?"已置顶":"置顶";pinButton.Foreground=Topmost?Green:Muted;Save();},"切换窗口置顶");pinButton.FontSize=10;pinButton.Padding=new Thickness(8,6,8,6);pinButton.Foreground=Topmost?Green:Muted;
-   controls.Children.Add(pinButton);var compactButton=Btn("收纳",()=>SetPresentation(true),"缩成一小条，保留桌面空间");compactButton.FontSize=10;compactButton.Padding=new Thickness(7,6,7,6);controls.Children.Add(compactButton);controls.Children.Add(Btn("−",()=>Hide(),"收起到系统托盘，双击托盘图标恢复"));controls.Children.Add(Btn("×",()=>Close(),"退出看球"));At(header,controls,1);root.Children.Add(header);
+   controls.Children.Add(pinButton);var compactButton=Btn("收纳",()=>SetPresentation(true),"缩成一小条，保留桌面空间");compactButton.FontSize=10;compactButton.Padding=new Thickness(7,6,7,6);controls.Children.Add(compactButton);controls.Children.Add(Btn("−",()=>Hide(),"隐藏到系统托盘"));controls.Children.Add(Btn("×",()=>Hide(),"关闭卡片，继续在系统托盘运行"));At(header,controls,1);root.Children.Add(header);
    var dateBar=Cols(-1,0);dateBar.ColumnDefinitions[1].Width=GridLength.Auto;dateBar.Margin=new Thickness(0,17,0,14);Grid.SetRow(dateBar,1);root.Children.Add(dateBar);
-   var today=Btn("今天",JumpToday,"回到今天的赛程位置");today.HorizontalAlignment=HorizontalAlignment.Left;today.Foreground=Green;At(dateBar,today,0);
+   var dates=new StackPanel{Orientation=Orientation.Horizontal};var today=Btn("今天",JumpToday,"回到今天的赛程位置");today.Foreground=Green;today.Padding=new Thickness(7,5,7,5);dates.Children.Add(today);
+   var previous=Btn("‹",()=>SelectDate(rangeStart.AddDays(-7)),"上一周");previous.Padding=new Thickness(5);dates.Children.Add(previous);var next=Btn("›",()=>SelectDate(rangeStart.AddDays(7)),"下一周");next.Padding=new Thickness(5);dates.Children.Add(next);
+   datePicker=new DatePicker{SelectedDate=rangeStart,Width=108,FontSize=10,VerticalAlignment=VerticalAlignment.Center,ToolTip="选择赛程起始日期（北京时间）"};datePicker.SelectedDateChanged+=(s,e)=>{if(!updatingDate&&datePicker.SelectedDate.HasValue)SelectDate(datePicker.SelectedDate.Value);};dates.Children.Add(datePicker);At(dateBar,dates,0);
    favoritesButton=Btn("关注球队",ShowFavorites,"添加或取消关注球队，支持多选");At(dateBar,favoritesButton,1);
-   var filters=new UniformGrid{Columns=7,Margin=new Thickness(0,0,0,13)};Grid.SetRow(filters,2);root.Children.Add(filters);
-   AddTab(filters,"all","全部");foreach(var league in League.All) AddTab(filters,league.Id,league.Name);
+   var filterPanel=new StackPanel{Margin=new Thickness(0,0,0,13)};Grid.SetRow(filterPanel,2);root.Children.Add(filterPanel);var filters=new UniformGrid{Columns=7};filterPanel.Children.Add(filters);
+   AddTab(filters,"all","全部");foreach(var league in League.Regular) AddTab(filters,league.Id,league.Name);
+   cupTabs=new UniformGrid{Columns=4,Margin=new Thickness(0,5,0,0)};filterPanel.Children.Add(cupTabs);foreach(var league in League.Cups)AddTab(cupTabs,league.Id,league.Name);
    var line=Cols(-1,0);line.ColumnDefinitions[1].Width=GridLength.Auto;Grid.SetRow(line,3);line.Margin=new Thickness(0,0,0,12);root.Children.Add(line);
    summary=T("正在读取今日赛程…",11,Muted);At(line,summary,0);liveButton=Btn("只看进行中",()=>{liveOnly=!liveOnly;liveButton.Foreground=liveOnly?Green:Muted;Render();});liveButton.FontSize=10;liveButton.Padding=new Thickness(7,4,7,4);At(line,liveButton,1);
    notice=T("",11,Green);noticeBox=new Border{Child=notice,Background=B("#183B30"),CornerRadius=new CornerRadius(8),Padding=new Thickness(10),Margin=new Thickness(0,0,0,10),Visibility=Visibility.Collapsed};Grid.SetRow(noticeBox,4);root.Children.Add(noticeBox);
    var options=Cols(-1,0);options.ColumnDefinitions[1].Width=GridLength.Auto;options.Margin=new Thickness(1,0,0,12);Grid.SetRow(options,5);root.Children.Add(options);
    favoritesToggle=new CheckBox{Content="只看关注球队",IsChecked=preferences.Favorites.OnlyFavorites,Foreground=Ink,FontSize=11,VerticalAlignment=VerticalAlignment.Center};
-   favoritesToggle.Click+=(s,e)=>{preferences.Favorites.OnlyFavorites=favoritesToggle.IsChecked==true;scroll.ScrollToTop();PersistFavorites();Render();};At(options,favoritesToggle,0);At(options,T("北京时间 UTC+8",10,Muted),1);
+   favoritesToggle.Click+=(s,e)=>{preferences.Favorites.OnlyFavorites=favoritesToggle.IsChecked==true;scroll.ScrollToTop();PersistFavorites();Render();};At(options,favoritesToggle,0);
+   cupsToggle=new CheckBox{Content="显示杯赛",IsChecked=preferences.ShowCups,Foreground=Ink,FontSize=11,VerticalAlignment=VerticalAlignment.Center};cupsToggle.Click+=(s,e)=>SetCups(cupsToggle.IsChecked==true);At(options,cupsToggle,1);
    list=new StackPanel();scroll=new ScrollViewer{Content=list,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled,Padding=new Thickness(0,0,3,0)};Grid.SetRow(scroll,6);root.Children.Add(scroll);
    var bottom=new StackPanel{Margin=new Thickness(0,12,0,0)};Grid.SetRow(bottom,7);root.Children.Add(bottom);
    var footRow=Cols(-1,0,0);footRow.ColumnDefinitions[1].Width=GridLength.Auto;footRow.ColumnDefinitions[2].Width=GridLength.Auto;bottom.Children.Add(footRow);
@@ -131,7 +170,7 @@ namespace Touchline {
    var expand=Btn("展开",()=>SetPresentation(false),"恢复完整比赛卡片");expand.FontSize=10;expand.Padding=new Thickness(3,4,3,4);expand.Margin=new Thickness(0);expand.Background=Brushes.Transparent;At(row,expand,2);
    var menu=new ContextMenu();var open=new MenuItem{Header="展开完整卡片"};open.Click+=(s,e)=>SetPresentation(false);menu.Items.Add(open);
    var opacity=new MenuItem{Header="调整透明度"};opacity.Click+=(s,e)=>ShowOpacityPopup(opacityButton);menu.Items.Add(opacity);
-   var hide=new MenuItem{Header="隐藏到系统托盘"};hide.Click+=(s,e)=>Hide();menu.Items.Add(hide);var quit=new MenuItem{Header="退出看球"};quit.Click+=(s,e)=>Close();menu.Items.Add(quit);compactCard.ContextMenu=menu;
+   var hide=new MenuItem{Header="隐藏到系统托盘"};hide.Click+=(s,e)=>Hide();menu.Items.Add(hide);var quit=new MenuItem{Header="退出看球"};quit.Click+=(s,e)=>Quit();menu.Items.Add(quit);compactCard.ContextMenu=menu;
    UpdateCompact();
   }
   void ApplyPresentation() {
@@ -140,7 +179,7 @@ namespace Touchline {
    compactCard.Visibility=preferences.Compact?Visibility.Visible:Visibility.Collapsed;
    if(preferences.Compact){Width=216;Height=36;ResizeMode=ResizeMode.NoResize;ShowInTaskbar=false;}
    else {Width=Clamp(preferences.Width,380,560);Height=Math.Min(Clamp(preferences.Height,440,1100),SystemParameters.WorkArea.Height-20);MinWidth=380;MinHeight=Math.Min(440,Height);ResizeMode=ResizeMode.CanResizeWithGrip;ShowInTaskbar=true;}
-   Opacity=preferences.ActiveOpacity();KeepOnScreen();
+   Opacity=preferences.ActiveOpacity();KeepOnScreen();SyncRefresh();
   }
   void KeepOnScreen() {
    var area=SystemParameters.WorkArea;Left=Math.Max(area.Left,Math.Min(Left,area.Right-Width));Top=Math.Max(area.Top,Math.Min(Top,area.Bottom-Height));
@@ -154,15 +193,15 @@ namespace Touchline {
   void UpdateCompact() {
    if(compactStatus==null)return;
    var first=teamDirectory.Primary(preferences.Favorites);compactBadge.Child=first==null?new Image{Source=Icon,Width=19,Height=19}:TeamBadge(first.Name,first.Logo,19,first.Id);
-   var games=ScheduleView.Select(results.SelectMany(x=>x.Matches),preferences.Favorites,filter,false);int live=games.Count(x=>x.State=="in");
-   compactStatus.Text=live>0?live+" 场进行中":"看球";compactStatus.Foreground=live>0?Green:Ink;
+   compactStatus.Text="看球 · 已暂停";compactStatus.Foreground=Muted;
    compactStatus.ToolTip=first==null?"看球 · 双击展开":Names.Team(first.Name)+" · 双击展开";
   }
-  FrameworkElement OpacityControls() {
+  FrameworkElement OpacityControls(bool? compactMode=null) {
+   bool compact=compactMode??preferences.Compact;double opacity=compact==preferences.Compact?Opacity:compact?preferences.CompactOpacity:preferences.Opacity;
    var panel=new StackPanel();var label=T("",11,Ink);panel.Children.Add(label);
-   var slider=new Slider{Minimum=0,Maximum=90,Value=Math.Round((1-Opacity)*100),TickFrequency=1,IsSnapToTickEnabled=true,Margin=new Thickness(0,10,0,8),ToolTip="0% 为不透明，90% 最透明"};
-   Action update=()=>label.Text=(preferences.Compact?"收纳条透明度 ":"卡片透明度 ")+Math.Round(slider.Value)+"%";update();
-   slider.ValueChanged+=(s,e)=>{Opacity=Preferences.LimitOpacity(1-slider.Value/100);update();Save();};panel.Children.Add(slider);panel.Children.Add(T("0% 清晰可见                 90% 接近透明",9,Muted));return panel;
+   var slider=new Slider{Minimum=0,Maximum=90,Value=Math.Round((1-opacity)*100),TickFrequency=1,IsSnapToTickEnabled=true,Margin=new Thickness(0,10,0,8),ToolTip="0% 为不透明，90% 最透明"};
+   Action update=()=>label.Text=(compact?"收纳条透明度 ":"卡片透明度 ")+Math.Round(slider.Value)+"%";update();
+   slider.ValueChanged+=(s,e)=>{double value=Preferences.LimitOpacity(1-slider.Value/100);if(compact==preferences.Compact)Opacity=value;else if(compact)preferences.CompactOpacity=value;else preferences.Opacity=value;update();Save();};panel.Children.Add(slider);return panel;
   }
   void ShowOpacityPopup(FrameworkElement anchor) {
    if(opacityPopup!=null)opacityPopup.IsOpen=false;
@@ -176,13 +215,17 @@ namespace Touchline {
    day=MatchData.BeijingToday;jumpToToday=true;
    if(rangeStart>day||rangeEnd<day){rangeStart=day;rangeEnd=day.AddDays(6);RefreshSoon();}else Render();
   }
+  void SelectDate(DateTime date){PauseRequests();rangeStart=date.Date;rangeEnd=rangeStart.AddDays(6);results=new LeagueResult[0];expanded=null;scroll.ScrollToTop();Render();RefreshSoon();}
+  void SetCups(bool show){if(preferences.ShowCups==show)return;preferences.ShowCups=show;PauseRequests();if(!show&&League.IsCup(filter))filter="all";results=results.Where(x=>show||!League.IsCup(x.League.Id)).ToArray();Save();Render();RefreshSoon();}
   void ExtendRange(bool earlier) {if(earlier)rangeStart=rangeStart.AddDays(-7);else rangeEnd=rangeEnd.AddDays(7);RefreshSoon();}
   async void RefreshSoon(bool force=false) { await Refresh(force); }
   async System.Threading.Tasks.Task Refresh(bool force=false) {
+   if(!CanRefresh)return;
    if(loading){refreshAgain=true;forceNext|=force;return;}loading=true;refreshButton.IsEnabled=false;footer.Text="正在同步赛程与比分…";
+   var request=new CancellationTokenSource();refreshCancel=request;if(force)badges.ClearFailures();
    var requestedStart=rangeStart;var requestedEnd=rangeEnd;
    try {
-    var incoming=await feed.LoadRange(requestedStart,requestedEnd,force);if(exiting)return;
+    var incoming=await feed.LoadRange(requestedStart,requestedEnd,force,preferences.ShowCups,request.Token);request.Token.ThrowIfCancellationRequested();if(!CanRefresh)return;
     if(rangeStart==requestedStart&&rangeEnd==requestedEnd) {
      results=incoming;
      var fresh=incoming.SelectMany(x=>x.Matches).Where(x=>!x.DataStale).ToList();teamDirectory.Learn(fresh);
@@ -196,18 +239,20 @@ namespace Touchline {
      }
      Render();
     }
-   } catch(Exception) { footer.Text="同步失败，稍后自动重试";footer.Foreground=Amber; }
+   } catch(OperationCanceledException) {} catch(Exception) { footer.Text="同步失败，稍后自动重试";footer.Foreground=Amber; }
    finally {
-    loading=false;if(!exiting){refreshButton.IsEnabled=true;due=DateTimeOffset.UtcNow.AddSeconds(results.Any(x=>x.Stale||x.Matches.Any(m=>m.State=="in"))?30:120);if(refreshAgain){refreshAgain=false;bool nextForce=forceNext;forceNext=false;RefreshSoon(nextForce);}}
+    if(Object.ReferenceEquals(refreshCancel,request)){refreshCancel=null;loading=false;if(!exiting){refreshButton.IsEnabled=true;due=DateTimeOffset.UtcNow.AddSeconds(results.Any(x=>x.Stale||x.Matches.Any(m=>m.State=="in"))?30:120);if(refreshAgain){refreshAgain=false;bool nextForce=forceNext;forceNext=false;RefreshSoon(nextForce);}}}request.Dispose();
    }
   }
   string TranslateNotice(string text) { foreach(var m in results.SelectMany(x=>x.Matches)){text=text.Replace(m.Home,Names.Team(m.Home)).Replace(m.Away,Names.Team(m.Away));}return text; }
   void Render() {
+   cupTabs.Visibility=preferences.ShowCups?Visibility.Visible:Visibility.Collapsed;cupsToggle.IsChecked=preferences.ShowCups;
+   updatingDate=true;datePicker.SelectedDate=rangeStart;updatingDate=false;
    UpdateCompact();
    UpdateFavoriteBadge();
    favoritesButton.Content="关注球队 · "+preferences.Favorites.TeamIds.Count;
    foreach(var kv in tabs){kv.Value.Background=B(kv.Key==filter?"#27503F":"#1C2B33");kv.Value.Foreground=kv.Key==filter?Green:Muted;}
-   var selected=results.Where(x=>filter=="all"||x.League.Id==filter).ToList();
+   var selected=results.Where(x=>(preferences.ShowCups||!League.IsCup(x.League.Id))&&(filter=="all"||x.League.Id==filter)).ToList();
    var shown=ScheduleView.Select(selected.SelectMany(x=>x.Matches),preferences.Favorites,filter,liveOnly);
    int playing=shown.Count(x=>x.State=="in");summary.Text=shown.Count+" 场比赛   ·   "+playing+" 场进行中";
    if(results.Length==0) summary.Text="正在读取赛程…";
@@ -240,6 +285,7 @@ namespace Touchline {
     footer.ToolTip=failed>0?String.Join("\n",results.Where(x=>x.Stale).Select(x=>x.League.Name+"：部分日期可能过期")):"赛中每30秒刷新，其他时间每2分钟检查。未来赛程缓存15分钟；点击刷新可立即重新读取。";
    }
    bool jump=jumpToToday;jumpToToday=false;var todayTarget=todayAnchor;
+   if(!CanRefresh)footer.Text="已暂停刷新 · 展开完整卡片后同步";UpdateTray();
    Dispatcher.BeginInvoke(new Action(()=>{
     list.UpdateLayout();
     if(jump){scroll.ScrollToVerticalOffset(todayTarget==null?0:todayTarget.TranslatePoint(new Point(0,0),list).Y);return;}
@@ -313,9 +359,44 @@ namespace Touchline {
   }
   void SetupTray() {
    tray=new Forms.NotifyIcon{Text="看球 · 桌面比分",Icon=applicationIcon,Visible=true};
-   tray.DoubleClick+=(s,e)=>Dispatcher.Invoke(new Action(()=>{SetPresentation(false);Show();Activate();}));
-   var menu=new Forms.ContextMenuStrip();menu.Items.Add("展开完整卡片",null,(s,e)=>Dispatcher.Invoke(new Action(()=>{SetPresentation(false);Show();Activate();})));menu.Items.Add("收纳成小条",null,(s,e)=>Dispatcher.Invoke(new Action(()=>{SetPresentation(true);Show();Activate();})));menu.Items.Add("退出",null,(s,e)=>Dispatcher.Invoke(new Action(Close)));tray.ContextMenuStrip=menu;
+   tray.DoubleClick+=(s,e)=>ShowCard();var menu=new Forms.ContextMenuStrip();tray.ContextMenuStrip=menu;
+   traySummary=new Forms.ToolStripMenuItem{Enabled=false};menu.Items.Add(traySummary);menu.Items.Add(new Forms.ToolStripSeparator());
+   trayVisibility=TrayItem(menu,"显示卡片",()=>{if(IsVisible)Hide();else ShowCard(false);});
+   TrayItem(menu,"展开 / 收纳",()=>{SetPresentation(!preferences.Compact);Show();Activate();});
+   trayPin=TrayItem(menu,"窗口置顶",()=>{Topmost=!Topmost;pinButton.Content=Topmost?"已置顶":"置顶";Save();UpdateTray();});
+   TrayItem(menu,"关注球队…",()=>{ShowCard();ShowFavorites();});TrayItem(menu,"打开卡片并刷新",OpenAndRefresh);
+   trayStartup=TrayItem(menu,"启动时仅显示托盘图标",()=>{preferences.StartInTray=!preferences.StartInTray;Save();UpdateTray();});
+   TrayItem(menu,"设置…",()=>{ShowCard();ShowSettings();});trayUpdates=TrayItem(menu,"检查更新…",ShowUpdates);
+   menu.Items.Add(new Forms.ToolStripSeparator());TrayItem(menu,"退出看球",Quit);menu.Opening+=(s,e)=>UpdateTray();UpdateTray();
   }
+  Forms.ToolStripMenuItem TrayItem(Forms.ContextMenuStrip menu,string title,Action action){var item=new Forms.ToolStripMenuItem(title);item.Click+=(s,e)=>Dispatcher.Invoke(action);menu.Items.Add(item);return item;}
+  void UpdateTray(){
+   if(tray==null||exiting)return;
+   int live=ScheduleView.Select(results.Where(x=>preferences.ShowCups||!League.IsCup(x.League.Id)).SelectMany(x=>x.Matches),preferences.Favorites,filter,liveOnly).Count(x=>x.State=="in");
+   traySummary.Text=CanRefresh?"当前赛程 · "+live+" 场进行中":"比分已暂停 · 展开后同步";trayVisibility.Text=IsVisible?"隐藏卡片":"显示卡片";trayPin.Checked=Topmost;trayStartup.Checked=preferences.StartInTray;
+   trayUpdates.Text=updater.Available==null?"检查更新…":"发现新版 "+updater.Available.Version+(updater.Ready?" · 已下载":"…");
+   var team=teamDirectory.Primary(preferences.Favorites);string name=team==null?"看球":Names.Team(team.Name),tooltip=name+" · "+traySummary.Text;tray.Text=tooltip.Length>63?tooltip.Substring(0,63):tooltip;
+   string key=team==null?"none":team.Id+"|"+team.Logo;if(trayBadgeKey==key)return;trayBadgeKey=key;int request=++trayBadgeRequest;
+   tray.Icon=applicationIcon;if(teamTrayIcon!=null){teamTrayIcon.Dispose();teamTrayIcon=null;}if(team!=null)LoadTrayBadge(team,request);
+  }
+  async void LoadTrayBadge(TeamEntry team,int request){
+   var bitmap=await badges.Load(teamDirectory.Logos(team.Id,team.Logo)).ConfigureAwait(false);
+   try{await Dispatcher.InvokeAsync(()=>{
+    if(exiting||request!=trayBadgeRequest)return;if(bitmap==null){trayBadgeKey=null;return;}
+    try{var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(bitmap));using(var stream=new MemoryStream()){encoder.Save(stream);stream.Position=0;using(var source=new System.Drawing.Bitmap(stream))using(var scaled=new System.Drawing.Bitmap(source,32,32)){var handle=scaled.GetHicon();try{using(var icon=System.Drawing.Icon.FromHandle(handle)){teamTrayIcon=(System.Drawing.Icon)icon.Clone();tray.Icon=teamTrayIcon;}}finally{DestroyIcon(handle);}}}}catch(Exception){trayBadgeKey=null;}
+   }).Task.ConfigureAwait(false);}catch(System.Threading.Tasks.TaskCanceledException){}
+  }
+  [System.Runtime.InteropServices.DllImport("user32.dll")]static extern bool DestroyIcon(IntPtr icon);
+  void ShowUpdates(){
+   if(updateDialog!=null){updateDialog.Activate();return;}
+   Hide();
+   var panel=new StackPanel{Margin=new Thickness(22)};var dialog=new Window{Title="看球更新",Width=390,SizeToContent=SizeToContent.Height,ResizeMode=ResizeMode.NoResize,Background=B("#182830"),Foreground=Ink,FontFamily=FontFamily,Content=panel,WindowStartupLocation=WindowStartupLocation.CenterScreen};updateDialog=dialog;dialog.Resources=Resources;
+   panel.Children.Add(T("看球 · "+AppUpdater.CurrentVersion,19,Ink,true));var status=T(updater.Status,12,Muted);status.Margin=new Thickness(0,18,0,18);panel.Children.Add(status);
+   var check=Btn("检查更新",async ()=>await updater.Check());panel.Children.Add(check);
+   var install=Btn("下载更新",async ()=>{if(!updater.Ready){await updater.Download();return;}try{Save();updater.BeginInstall(true);dialog.Close();exiting=true;Close();}catch(Exception ex){MessageBox.Show(dialog,"更新未安装："+ex.Message,"看球更新");}});install.Margin=new Thickness(0,8,0,0);panel.Children.Add(install);
+   Action draw=()=>{status.Text=updater.Status;check.IsEnabled=!updater.Busy;install.IsEnabled=!updater.Busy&&updater.Available!=null;install.Content=updater.Ready?"安装并重启":"下载更新";};updater.Changed+=draw;dialog.Closed+=(s,e)=>{updater.Changed-=draw;updateDialog=null;};draw();dialog.Show();if(updater.Available==null)CheckManually();
+  }
+  async void CheckManually(){await updater.Check();}
   void ShowFavorites() {
    var panel=new Grid{Margin=new Thickness(20)};
    foreach(var height in new[]{GridLength.Auto,GridLength.Auto,GridLength.Auto,new GridLength(1,GridUnitType.Star),GridLength.Auto})panel.RowDefinitions.Add(new RowDefinition{Height=height});
@@ -335,7 +416,8 @@ namespace Touchline {
     var found=all.Where(t=>(term.Length==0||Names.Team(t.Name).IndexOf(term,StringComparison.OrdinalIgnoreCase)>=0||t.Name.IndexOf(term,StringComparison.OrdinalIgnoreCase)>=0)&&(selectedOnly.IsChecked!=true||preferences.Favorites.Contains(t.Id))).OrderBy(t=>preferences.Favorites.Contains(t.Id)?preferences.Favorites.TeamIds.IndexOf(t.Id):Int32.MaxValue).ThenBy(t=>Names.Team(t.Name),StringComparer.CurrentCulture).ToList();
     foreach(var team in found) {
      var label=new StackPanel();label.Children.Add(T(Names.Team(team.Name),13,Ink,true));label.Children.Add(T(team.League+" · "+team.Name,10,Muted));
-     var cb=new CheckBox{Content=label,IsChecked=preferences.Favorites.Contains(team.Id),Foreground=Ink,Margin=new Thickness(3,8,7,8),VerticalContentAlignment=VerticalAlignment.Center,HorizontalContentAlignment=HorizontalAlignment.Stretch,Padding=new Thickness(7,0,0,0)};
+     var teamLabel=new StackPanel{Orientation=Orientation.Horizontal};var icon=TeamBadge(team.Name,team.Logo,26,team.Id);icon.Margin=new Thickness(0,0,8,0);teamLabel.Children.Add(icon);teamLabel.Children.Add(label);
+     var cb=new CheckBox{Content=teamLabel,IsChecked=preferences.Favorites.Contains(team.Id),Foreground=Ink,Margin=new Thickness(3,8,7,8),VerticalContentAlignment=VerticalAlignment.Center,HorizontalContentAlignment=HorizontalAlignment.Stretch,Padding=new Thickness(7,0,0,0)};
      cb.Click+=(s,e)=>{preferences.Favorites.Set(team.Id,cb.IsChecked==true);PersistFavorites();Render();draw();};
      var teamRow=Cols(-1,0);teamRow.ColumnDefinitions[1].Width=GridLength.Auto;At(teamRow,cb,0);
      if(preferences.Favorites.Contains(team.Id)) {
@@ -351,8 +433,10 @@ namespace Touchline {
   }
   void ShowSettings() {
    var panel=new StackPanel{Margin=new Thickness(22)};
-   var dialog=new Window{Title="看球设置",Owner=this,Width=360,Height=470,ResizeMode=ResizeMode.NoResize,WindowStartupLocation=WindowStartupLocation.CenterOwner,Background=B("#182830"),Foreground=Ink,FontFamily=FontFamily,Content=panel,Topmost=Topmost};
+   var dialog=new Window{Title="看球设置",Owner=this,Width=380,Height=Math.Min(660,SystemParameters.WorkArea.Height-40),ResizeMode=ResizeMode.NoResize,WindowStartupLocation=WindowStartupLocation.CenterOwner,Background=B("#182830"),Foreground=Ink,FontFamily=FontFamily,Content=new ScrollViewer{Content=panel,VerticalScrollBarVisibility=ScrollBarVisibility.Auto},Topmost=Topmost};
    panel.Children.Add(T("让比分留在你身边",17,Ink,true));
+   var startTray=new CheckBox{Content="启动时仅显示托盘图标",IsChecked=preferences.StartInTray,Foreground=Ink,Margin=new Thickness(0,18,0,12)};startTray.Click+=(s,e)=>{preferences.StartInTray=startTray.IsChecked==true;Save();UpdateTray();};panel.Children.Add(startTray);
+   var cups=new CheckBox{Content="显示国内杯赛",IsChecked=preferences.ShowCups,Foreground=Ink,Margin=new Thickness(0,0,0,12)};cups.Click+=(s,e)=>SetCups(cups.IsChecked==true);panel.Children.Add(cups);
    var autoStart=new CheckBox{Content="开机自启",Foreground=Ink,Margin=new Thickness(0,22,0,14),ToolTip="默认关闭；开启后登录 Windows 自动运行"};
    try{autoStart.IsChecked=startup.Enabled;}catch(Exception ex){autoStart.IsEnabled=false;autoStart.ToolTip="无法读取自启设置："+ex.Message;}
    autoStart.Click+=(s,e)=>{
@@ -360,9 +444,12 @@ namespace Touchline {
     try{startup.SetEnabled(enabled);}catch(Exception ex){autoStart.IsChecked=!enabled;MessageBox.Show(dialog,"自启设置未能保存："+ex.Message,"开机自启",MessageBoxButton.OK,MessageBoxImage.Warning);}
    };panel.Children.Add(autoStart);
    var sound=new CheckBox{Content="比分变化时播放提示音",IsChecked=preferences.Sound,Foreground=Ink,Margin=new Thickness(0,0,0,20)};sound.Checked+=(s,e)=>{preferences.Sound=true;Save();};sound.Unchecked+=(s,e)=>{preferences.Sound=false;Save();};panel.Children.Add(sound);
-   var transparency=OpacityControls();transparency.Margin=new Thickness(0,0,0,18);panel.Children.Add(transparency);
-   panel.Children.Add(T("拖动左上角标题移动卡片；拖动右下角调整大小。收起后，双击托盘图标可恢复。",11,Muted));
-   panel.Children.Add(T("赛中每30秒刷新，其余每2分钟刷新。数据可能延迟，缺失项显示为“—”。",10,Muted));
+   foreach(bool compact in new[]{false,true}){var transparency=OpacityControls(compact);transparency.Margin=new Thickness(0,0,0,18);panel.Children.Add(transparency);}
+   panel.Children.Add(T("完整卡片显示时更新比分；收纳或隐藏后暂停。退出请使用托盘菜单。",11,Muted));
+   var checkUpdates=new CheckBox{Content="自动检查新版本（每天）",IsChecked=preferences.AutoCheckUpdates,Foreground=Ink,Margin=new Thickness(0,18,0,12)};
+   var downloadUpdates=new CheckBox{Content="自动下载并在退出时安装",IsChecked=preferences.AutoDownloadUpdates,IsEnabled=preferences.AutoCheckUpdates,Foreground=Ink,Margin=new Thickness(0,0,0,12)};
+   checkUpdates.Click+=(s,e)=>{preferences.AutoCheckUpdates=checkUpdates.IsChecked==true;downloadUpdates.IsEnabled=preferences.AutoCheckUpdates;Save();};downloadUpdates.Click+=(s,e)=>{preferences.AutoDownloadUpdates=downloadUpdates.IsChecked==true;Save();};panel.Children.Add(checkUpdates);panel.Children.Add(downloadUpdates);
+   panel.Children.Add(Btn("检查更新 · "+AppUpdater.CurrentVersion,()=>{dialog.Close();ShowUpdates();}));
    var saved=T("关注配置保存在本机：\n"+favoriteStore.FilePath,10,Muted);saved.Margin=new Thickness(0,15,0,8);panel.Children.Add(saved);
    panel.Children.Add(Btn("打开配置目录",()=>System.Diagnostics.Process.Start("explorer.exe","\""+dataDir+"\"")));
    dialog.Resources=Resources;
@@ -378,7 +465,7 @@ namespace Touchline {
   }
   void Save() {
    preferences.CaptureLayout(Left,Top,Width,Height,Opacity);preferences.Pinned=Topmost;
-   try{File.WriteAllText(Path.Combine(dataDir,"settings.json"),new JavaScriptSerializer().Serialize(preferences));}catch(Exception){}
+   try{preferenceStore.Save(preferences);}catch(Exception){if(notice!=null){notice.Text="窗口设置未能保存，请检查本地目录权限。";noticeBox.Visibility=Visibility.Visible;noticeUntil=DateTimeOffset.UtcNow.AddMinutes(2);}}
   }
   const string Styles=@"<ResourceDictionary xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml'>
   <Style TargetType='Button'><Setter Property='Foreground' Value='#CBD8DE'/><Setter Property='Background' Value='#22323A'/><Setter Property='BorderThickness' Value='0'/><Setter Property='FontFamily' Value='Microsoft YaHei UI'/><Setter Property='Template'><Setter.Value><ControlTemplate TargetType='Button'><Border x:Name='surface' Background='{TemplateBinding Background}' CornerRadius='6' Padding='{TemplateBinding Padding}'><ContentPresenter HorizontalAlignment='{TemplateBinding HorizontalContentAlignment}' VerticalAlignment='Center'/></Border><ControlTemplate.Triggers><Trigger Property='IsMouseOver' Value='True'><Setter TargetName='surface' Property='Opacity' Value='.75'/></Trigger><Trigger Property='IsEnabled' Value='False'><Setter TargetName='surface' Property='Opacity' Value='.4'/></Trigger><Trigger Property='IsKeyboardFocused' Value='True'><Setter TargetName='surface' Property='BorderBrush' Value='#63E7AE'/><Setter TargetName='surface' Property='BorderThickness' Value='1'/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter></Style>
@@ -387,11 +474,13 @@ namespace Touchline {
  </ResourceDictionary>";
  }
  public static class Program {
-  [STAThread] public static void Main() {
+  [STAThread] public static int Main(string[] args) {
+   if(args.Length==2&&args[0]=="--apply-update")return AppUpdater.Install(args[1]);
    bool created;using(var mutex=new Mutex(true,"Local\\TouchlineCard.Desktop",out created)) {
-    if(!created){MessageBox.Show("看球已经在运行。请在系统托盘中双击图标恢复卡片。","看球");return;}
-    try{var app=new Application();app.Run(new CardWindow());}catch(Exception ex){MessageBox.Show("无法启动看球卡片："+ex.Message,"看球");}
+    if(!created){MessageBox.Show("看球已经在运行。请在系统托盘中双击图标恢复卡片。","看球");return 0;}
+    try{var app=new Application{ShutdownMode=ShutdownMode.OnExplicitShutdown};var window=new CardWindow();app.MainWindow=window;window.Dispatcher.BeginInvoke(new Action(window.Start));app.Run();}catch(Exception ex){MessageBox.Show("无法启动看球卡片："+ex.Message,"看球");return 1;}
    }
+   return 0;
   }
  }
 }

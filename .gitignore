@@ -8,6 +8,8 @@ macos/.build/
 *.exe
 *.dll
 *.pdb
+*.private.xml
+*.previous
 
 # Personal settings and match cache must stay on the user's computer
 settings.json

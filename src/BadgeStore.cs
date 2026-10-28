@@ -16,8 +16,11 @@ namespace Touchline {
   readonly object gate=new object();
   readonly Dictionary<string,BitmapSource> images=new Dictionary<string,BitmapSource>();
   readonly Dictionary<string,Task<BitmapSource>> pending=new Dictionary<string,Task<BitmapSource>>();
+  readonly Dictionary<string,DateTime> failures=new Dictionary<string,DateTime>();
+  readonly Dictionary<string,DateTime> expires=new Dictionary<string,DateTime>();
   readonly string cacheDir;
   public BadgeStore(string directory) {cacheDir=directory;}
+  public void ClearFailures(){lock(gate)failures.Clear();}
   static HttpClient CreateClient() {
    ServicePointManager.SecurityProtocol=SecurityProtocolType.Tls12;
    var client=new HttpClient{Timeout=TimeSpan.FromSeconds(10),MaxResponseContentBufferSize=2*1024*1024};
@@ -29,11 +32,13 @@ namespace Touchline {
     foreach(var url in sources){var image=await LoadOne(url).ConfigureAwait(false);if(image!=null)return image;}
     if(attempt==0)await Task.Delay(1500).ConfigureAwait(false);
    }
-   return null;
+   lock(gate)foreach(var url in sources)failures[url]=DateTime.UtcNow.AddSeconds(30);return null;
   }
   Task<BitmapSource> LoadOne(string url) {
    lock(gate) {
-    BitmapSource image;if(images.TryGetValue(url,out image))return Task.FromResult(image);
+    BitmapSource image;DateTime until;
+    if(images.TryGetValue(url,out image)&&expires.TryGetValue(url,out until)&&until>DateTime.UtcNow)return Task.FromResult(image);
+    if(failures.TryGetValue(url,out until)&&until>DateTime.UtcNow)return Task.FromResult(image);
     Task<BitmapSource> task;if(pending.TryGetValue(url,out task))return task;
     task=Task.Run(async ()=>{
      try {var loaded=await Read(url).ConfigureAwait(false);if(loaded!=null)lock(gate)images[url]=loaded;return loaded;}
@@ -45,13 +50,16 @@ namespace Touchline {
   async Task<BitmapSource> Read(string url) {
    string key;using(var hash=SHA256.Create())key=BitConverter.ToString(hash.ComputeHash(Encoding.UTF8.GetBytes(url))).Replace("-","");
    string path=Path.Combine(cacheDir,key+".png");BitmapSource cached=null;
-   try {cached=Decode(File.ReadAllBytes(path));if(DateTime.UtcNow-File.GetLastWriteTimeUtc(path)<TimeSpan.FromDays(30))return cached;}catch(Exception){}
+   try {cached=Decode(File.ReadAllBytes(path));var expiry=File.GetLastWriteTimeUtc(path).AddDays(30);if(expiry>DateTime.UtcNow){lock(gate)expires[url]=expiry;return cached;}}catch(Exception){}
    await Slots.WaitAsync().ConfigureAwait(false);
    try {
     var bytes=await Http.GetByteArrayAsync(url).ConfigureAwait(false);var image=Decode(bytes);
-    try {Directory.CreateDirectory(cacheDir);File.WriteAllBytes(path,bytes);}catch(IOException){}catch(UnauthorizedAccessException){}
+    lock(gate)expires[url]=DateTime.UtcNow.AddDays(30);
+    string temp=path+"."+Guid.NewGuid().ToString("N")+".tmp";
+    try {Directory.CreateDirectory(cacheDir);File.WriteAllBytes(temp,bytes);if(File.Exists(path))File.Replace(temp,path,null);else File.Move(temp,path);}catch(IOException){}catch(UnauthorizedAccessException){}
+    finally{try{if(File.Exists(temp))File.Delete(temp);}catch(IOException){}catch(UnauthorizedAccessException){}}
     return image;
-   }catch(Exception){return cached;}
+   }catch(Exception){if(cached!=null)lock(gate)expires[url]=DateTime.UtcNow.AddSeconds(30);return cached;}
    finally {Slots.Release();}
   }
   static BitmapSource Decode(byte[] bytes) {

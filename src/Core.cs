@@ -51,6 +51,8 @@ namespace Touchline {
   public static string Str(object x,string key) { return Convert.ToString(Get(x,key),CultureInfo.InvariantCulture); }
   public static IEnumerable<object> Items(object x) { return (x as IEnumerable ?? new object[0]).Cast<object>(); }
   public static bool Flag(object x,string key) { return Object.Equals(Get(x,key),true); }
+  static string Score(object side){var value=Get(side,"score");return value is Dictionary<string,object>?Convert.ToString(Get(value,"displayValue")??Get(value,"value"),CultureInfo.InvariantCulture):Convert.ToString(value,CultureInfo.InvariantCulture);}
+  static string TeamId(object side){return Convert.ToString(Get(side,"id")??Get(Get(side,"team"),"id"),CultureInfo.InvariantCulture);}
   static Dictionary<string,string> Stats(object team) {
    return Items(Get(team,"statistics")).Where(x=>Str(x,"name")!="").GroupBy(x=>Str(x,"name")).ToDictionary(x=>x.Key,x=>Str(x.Last(),"displayValue"));
   }
@@ -71,10 +73,10 @@ namespace Touchline {
     if((localDay<start.Date||localDay>end.Date) && !(carryLive && state=="in" && localDay==start.Date.AddDays(-1))) continue;
     var sides=Items(Get(comp,"competitors")).ToList();
     var home=sides.FirstOrDefault(x=>Str(x,"homeAway")=="home");var away=sides.FirstOrDefault(x=>Str(x,"homeAway")=="away");
-    if(home==null || away==null) continue;
+    if(home==null || away==null || String.IsNullOrEmpty(Str(ev,"id"))) continue;
     var m=new Match{Id=Str(ev,"id"),League=league,Kickoff=kickoff,State=state,StatusName=Str(type,"name"),Clock=Str(status,"displayClock"),
-     Home=Str(Get(home,"team"),"displayName"),Away=Str(Get(away,"team"),"displayName"),HomeId=Str(home,"id"),AwayId=Str(away,"id"),
-     HomeLogo=Str(Get(home,"team"),"logo"),AwayLogo=Str(Get(away,"team"),"logo"),HomeScore=Str(home,"score"),AwayScore=Str(away,"score"),
+     Home=Str(Get(home,"team"),"displayName"),Away=Str(Get(away,"team"),"displayName"),HomeId=TeamId(home),AwayId=TeamId(away),
+     HomeLogo=Str(Get(home,"team"),"logo"),AwayLogo=Str(Get(away,"team"),"logo"),HomeScore=Score(home),AwayScore=Score(away),
      Venue=Str(Get(comp,"venue"),"fullName"),HomeStats=Stats(home),AwayStats=Stats(away)};
     switch(m.StatusName) {
      case "STATUS_POSTPONED":m.Status="延期";break;
