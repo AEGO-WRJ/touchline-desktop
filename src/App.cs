@@ -16,7 +16,7 @@ using System.Web.Script.Serialization;
 using Forms=System.Windows.Forms;
 
 namespace Touchline {
- public class CardWindow:Window {
+ public partial class CardWindow:Window {
   readonly string dataDir=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"TouchlineCard");
   readonly ScoreFeed feed;
   readonly FavoriteStore favoriteStore;
@@ -84,7 +84,7 @@ namespace Touchline {
    if(!String.IsNullOrEmpty(favoriteStore.Warning)){notice.Text=favoriteStore.Warning;notice.Foreground=Amber;noticeBox.Visibility=Visibility.Visible;noticeUntil=DateTimeOffset.UtcNow.AddMinutes(2);}
    timer.Interval=TimeSpan.FromSeconds(1);timer.Tick+=async (s,e)=>{
     if(noticeBox.Visibility==Visibility.Visible && DateTimeOffset.UtcNow>noticeUntil) noticeBox.Visibility=Visibility.Collapsed;
-    if(CanRefresh){AdvanceDay();if(DateTimeOffset.UtcNow>=due&&!loading)await Refresh();}
+    if(CanRefresh){AdvanceDay();SyncPlayers();if(DateTimeOffset.UtcNow>=due&&!loading)await Refresh();}
     if(!exiting)await updater.Tick();
    };timer.Start();
    IsVisibleChanged+=(s,e)=>SyncRefresh();
@@ -98,7 +98,7 @@ namespace Touchline {
   public void Start(){if(!preferences.StartInTray)ShowCard(false);else{footer.Text="已暂停刷新 · 展开完整卡片后同步";UpdateTray();}}
   bool CanRefresh {get{return IsVisible&&!preferences.Compact&&!suspended&&!exiting&&WindowState!=WindowState.Minimized;}}
   void AdvanceDay(){var today=MatchData.BeijingToday;if(day==today)return;if(rangeStart==day){rangeStart=today;rangeEnd=today.AddDays(6);}day=today;due=DateTimeOffset.MinValue;Render();}
-  void PauseRequests(){var active=refreshCancel;refreshCancel=null;if(active!=null)active.Cancel();loading=false;refreshAgain=false;forceNext=false;if(refreshButton!=null)refreshButton.IsEnabled=true;}
+  void PauseRequests(){CancelPlayers();var active=refreshCancel;refreshCancel=null;if(active!=null)active.Cancel();loading=false;refreshAgain=false;forceNext=false;if(refreshButton!=null)refreshButton.IsEnabled=true;}
   void SyncRefresh(bool force=false){
    bool active=CanRefresh;
    if(!active){refreshVisible=false;PauseRequests();if(footer!=null)footer.Text="已暂停刷新 · 展开完整卡片后同步";}
@@ -221,6 +221,7 @@ namespace Touchline {
   async void RefreshSoon(bool force=false) { await Refresh(force); }
   async System.Threading.Tasks.Task Refresh(bool force=false) {
    if(!CanRefresh)return;
+   SyncPlayers(force);
    if(loading){refreshAgain=true;forceNext|=force;return;}loading=true;refreshButton.IsEnabled=false;footer.Text="正在同步赛程与比分…";
    var request=new CancellationTokenSource();refreshCancel=request;if(force)badges.ClearFailures();
    var requestedStart=rangeStart;var requestedEnd=rangeEnd;
@@ -246,6 +247,7 @@ namespace Touchline {
   }
   string TranslateNotice(string text) { foreach(var m in results.SelectMany(x=>x.Matches)){text=text.Replace(m.Home,Names.Team(m.Home)).Replace(m.Away,Names.Team(m.Away));}return text; }
   void Render() {
+   playerHost=null;
    cupTabs.Visibility=preferences.ShowCups?Visibility.Visible:Visibility.Collapsed;cupsToggle.IsChecked=preferences.ShowCups;
    updatingDate=true;datePicker.SelectedDate=rangeStart;updatingDate=false;
    UpdateCompact();
@@ -284,6 +286,7 @@ namespace Touchline {
     footer.Text=failed>0?failed+" 项赛事连接异常 · 30秒重试":"赛中30秒刷新 · 赛程连续排列";
     footer.ToolTip=failed>0?String.Join("\n",results.Where(x=>x.Stale).Select(x=>x.League.Name+"：部分日期可能过期")):"赛中每30秒刷新，其他时间每2分钟检查。未来赛程缓存15分钟；点击刷新可立即重新读取。";
    }
+   SyncPlayers();
    bool jump=jumpToToday;jumpToToday=false;var todayTarget=todayAnchor;
    if(!CanRefresh)footer.Text="已暂停刷新 · 展开完整卡片后同步";UpdateTray();
    Dispatcher.BeginInvoke(new Action(()=>{
@@ -306,6 +309,9 @@ namespace Touchline {
    if(open) {
     var detail=new StackPanel{Margin=new Thickness(13,0,13,13)};detail.Children.Add(new Border{Height=1,Background=B("#37505A"),Margin=new Thickness(0,0,0,12)});
     var followRow=Cols(-1,-1);followRow.Margin=new Thickness(0,0,0,12);At(followRow,FollowButton(m.HomeId,"主队"),0);At(followRow,FollowButton(m.AwayId,"客队"),1);detail.Children.Add(followRow);
+    var views=Cols(-1,-1);views.Margin=new Thickness(0,0,0,12);var statsTab=Btn("比赛数据",()=>{showPlayers=false;Render();});var playersTab=Btn("阵容与球员",()=>{showPlayers=true;Render();});statsTab.Foreground=showPlayers?Muted:Green;playersTab.Foreground=showPlayers?Green:Muted;At(views,statsTab,0);At(views,playersTab,1);detail.Children.Add(views);
+    if(showPlayers)AddPlayerPanel(m,detail);
+    else {
     if(m.DataUpdated.HasValue){var updated=T((m.DataStale?"连接异常 · 缓存可能过期\n":"")+"数据读取："+m.DataUpdated.Value.ToOffset(TimeSpan.FromHours(8)).ToString("MM-dd HH:mm:ss"),9,m.DataStale?Amber:Muted);updated.Margin=new Thickness(0,0,0,10);detail.Children.Add(updated);}
     if(m.HomeStats.Count==0 && m.AwayStats.Count==0) {var no=T(m.State=="pre"?"开赛后将在这里显示比赛统计":"数据源暂未提供本场统计",11,Muted);no.Margin=new Thickness(0,0,0,10);detail.Children.Add(no);}
     else {Stat(detail,m,"possessionPct","控球率",true);Stat(detail,m,"totalShots","射门",false);Stat(detail,m,"shotsOnTarget","射正",false);Stat(detail,m,"wonCorners","角球",false);Stat(detail,m,"foulsCommitted","犯规",false);}
@@ -316,6 +322,7 @@ namespace Touchline {
      var player=T(ev.Player+"\n"+Names.Team(ev.TeamId==m.HomeId?m.Home:ev.TeamId==m.AwayId?m.Away:""),10,Ink);At(row,player,2);detail.Children.Add(row);
     }
     if(!String.IsNullOrEmpty(m.Venue)){var venue=T("球场 · "+m.Venue,9,Muted);venue.Margin=new Thickness(0,12,0,0);detail.Children.Add(venue);}
+    }
     stack.Children.Add(detail);
    }
    return outer;
