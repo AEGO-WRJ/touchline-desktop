@@ -4,7 +4,7 @@ Windows / macOS 桌面足球卡片：五大联赛、欧冠、足总杯、英格�
 
 | 平台 | 下载 | 系统 |
 | --- | --- | --- |
-| Windows | [Windows 版](https://github.com/AEGO-WRJ/touchline-desktop/releases/tag/v1.4.0-windows.1) → `Touchline.exe` | Windows 10/11 |
+| Windows | [Windows 版](https://github.com/AEGO-WRJ/touchline-desktop/releases/tag/v1.5.0-windows.1) → `Touchline.exe` | Windows 10/11 |
 | macOS | [Mac 版](https://github.com/AEGO-WRJ/touchline-desktop/releases/tag/v1.3.3-macos.1) → `Touchline-macOS-universal.zip` | macOS 13+，Apple Silicon / Intel |
 
 Windows 双击运行；Mac 解压后放入“应用程序”。两个版本默认驻留托盘或菜单栏，点击图标显示卡片。Windows 1.2.0 及更早版本需手动替换一次，此后支持应用内更新。[Mac 首次安装与详细说明](macos/README.md)。
@@ -13,6 +13,7 @@ Windows 双击运行；Mac 解压后放入“应用程序”。两个版本默�
 
 - 赛程按北京时间排序，可选日期、切换周、回到今天；点击比赛展开统计和关键事件。
 - Windows 的“阵容与球员”可查看首发阵型、当前在场、首发和替补，点击球员查看号码、位置、个人统计与换人记录。本场评分来自 FotMob，缺失时显示 `—`；仅打开该详情时刷新。
+- 站位图显示号码、姓名和评分；“双方球场”打开横向大图。站位为阵型示意，换人沿用被换下球员位置；缺失位置保留在名单。队徽自动选择深浅底衬以提高对比度。
 - 可关注多支球队、排序、只看关注；首位球队队徽也会显示在托盘或菜单栏。
 - “显示杯赛”默认开启，可单独筛选杯赛；关闭后隐藏并停止请求国内杯赛，欧冠不受影响。
 - 可置顶、收纳为小条，分别设置卡片和小条透明度。完整卡片显示时才更新比分，收纳或隐藏后取消请求，展开立即同步。

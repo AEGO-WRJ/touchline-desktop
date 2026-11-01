@@ -7,7 +7,8 @@ using System.Web.Script.Serialization;
 
 namespace Touchline {
  public class MatchPlayer {
-  public string Id,Name,Number,Position,Country,Age;
+  public string Id,Name,Number,Position,Country,Age,ReplacesId;
+  public double? PitchX,PitchY;
   public bool Starter,SubbedIn,SubbedOut,SentOff;
   public double? Rating;
   public Dictionary<string,string> Stats=new Dictionary<string,string>();
@@ -48,6 +49,7 @@ namespace Touchline {
       string kind=MatchData.Flag(play,"redCard")?"红牌":MatchData.Flag(play,"yellowCard")?"黄牌":MatchData.Flag(play,"ownGoal")?"乌龙球":MatchData.Flag(play,"scoringPlay")?"进球":MatchData.Flag(play,"substitution")?"换人":"";
       if(kind=="红牌")p.SentOff=true;if(kind!="")p.Events.Add(Str(Get(play,"clock"),"displayValue")+" "+kind);
      }
+     p.ReplacesId=Str(Get(Get(entry,"subbedInFor"),"athlete"),"id");
      string incoming=Str(Get(Get(entry,"subbedInFor"),"athlete"),"displayName");if(incoming!="")p.Events.Add("换下 "+incoming);
      string outgoing=Str(Get(Get(entry,"subbedOutFor"),"athlete"),"displayName");if(outgoing!="")p.Events.Add("被 "+outgoing+" 换下");
      squad.Players.Add(p);
@@ -102,6 +104,8 @@ namespace Touchline {
      var candidates=players.Where(x=>SamePlayer(p,x)).ToList();if(candidates.Count!=1)continue;var player=candidates[0];
      double rating;if(Double.TryParse(Str(Get(player,"performance"),"rating"),NumberStyles.Any,CultureInfo.InvariantCulture,out rating)&&rating>0&&rating<=10)p.Rating=rating;
      p.Age=Str(player,"age");p.Country=Str(player,"countryName");
+     var layout=Get(player,"verticalLayout");double px,py;
+     if(Double.TryParse(Str(layout,"x"),NumberStyles.Any,CultureInfo.InvariantCulture,out px)&&Double.TryParse(Str(layout,"y"),NumberStyles.Any,CultureInfo.InvariantCulture,out py)&&px>=0&&px<=1&&py>=0&&py<=1){p.PitchX=px;p.PitchY=py;}
      if(p.Position=="位置待提供")switch(Str(player,"usualPlayingPositionId")){case "0":p.Position="门将";break;case "1":p.Position="后卫";break;case "2":p.Position="中场";break;case "3":p.Position="前锋";break;}
     }
    }

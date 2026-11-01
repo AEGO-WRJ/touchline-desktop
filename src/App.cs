@@ -57,7 +57,7 @@ namespace Touchline {
   string trayBadgeKey;
   int trayBadgeRequest;
   System.Drawing.Icon applicationIcon;
-  static readonly Brush Ink=B("#EAF2F3"),Muted=B("#91A2A9"),Green=B("#63E7AE"),Amber=B("#F1C779");
+  static readonly Brush Ink=B("#F1F6F3"),Muted=B("#B4C4C5"),Green=B("#63E7AE"),Amber=B("#F1C779");
   public CardWindow() {
    Directory.CreateDirectory(dataDir);feed=new ScoreFeed(Path.Combine(dataDir,"cache"));badges=new BadgeStore(Path.Combine(dataDir,"badges"));
    using(var stream=System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceStream("Touchline.Icon")) {
@@ -98,7 +98,7 @@ namespace Touchline {
   public void Start(){if(!preferences.StartInTray)ShowCard(false);else{footer.Text="已暂停刷新 · 展开完整卡片后同步";UpdateTray();}}
   bool CanRefresh {get{return IsVisible&&!preferences.Compact&&!suspended&&!exiting&&WindowState!=WindowState.Minimized;}}
   void AdvanceDay(){var today=MatchData.BeijingToday;if(day==today)return;if(rangeStart==day){rangeStart=today;rangeEnd=today.AddDays(6);}day=today;due=DateTimeOffset.MinValue;Render();}
-  void PauseRequests(){CancelPlayers();var active=refreshCancel;refreshCancel=null;if(active!=null)active.Cancel();loading=false;refreshAgain=false;forceNext=false;if(refreshButton!=null)refreshButton.IsEnabled=true;}
+  void PauseRequests(){if(!CanRefresh)ClosePitch();CancelPlayers();var active=refreshCancel;refreshCancel=null;if(active!=null)active.Cancel();loading=false;refreshAgain=false;forceNext=false;if(refreshButton!=null)refreshButton.IsEnabled=true;}
   void SyncRefresh(bool force=false){
    bool active=CanRefresh;
    if(!active){refreshVisible=false;PauseRequests();if(footer!=null)footer.Text="已暂停刷新 · 展开完整卡片后同步";}
@@ -126,7 +126,7 @@ namespace Touchline {
   }
   static void At(Grid g,UIElement item,int column) { Grid.SetColumn(item,column);g.Children.Add(item); }
   void Build() {
-   var shell=new Border{Background=B("#111C22"),BorderBrush=B("#31424A"),BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(18),Margin=new Thickness(8),Padding=new Thickness(18,17,18,12)};
+   var shell=new Border{Background=B("#1D2C30"),BorderBrush=B("#486166"),BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(18),Margin=new Thickness(8),Padding=new Thickness(18,17,18,12)};
    shell.Effect=new System.Windows.Media.Effects.DropShadowEffect{Color=Colors.Black,BlurRadius=14,Opacity=.35,ShadowDepth=3};fullCard=shell;viewHost=new Grid();viewHost.Children.Add(shell);Content=viewHost;
    var root=new Grid();shell.Child=root;
    foreach(var size in new[]{GridLength.Auto,GridLength.Auto,GridLength.Auto,GridLength.Auto,GridLength.Auto,GridLength.Auto,new GridLength(1,GridUnitType.Star),GridLength.Auto})root.RowDefinitions.Add(new RowDefinition{Height=size});
@@ -161,7 +161,7 @@ namespace Touchline {
    Render();
   }
   void BuildCompact() {
-   compactCard=new Border{Background=B("#14252C"),BorderBrush=B("#49606A"),BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(10),Margin=new Thickness(2),Padding=new Thickness(8,0,5,0),Visibility=Visibility.Collapsed};viewHost.Children.Add(compactCard);
+   compactCard=new Border{Background=B("#243B40"),BorderBrush=B("#49606A"),BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(10),Margin=new Thickness(2),Padding=new Thickness(8,0,5,0),Visibility=Visibility.Collapsed};viewHost.Children.Add(compactCard);
    var row=Cols(-1,30,38);compactCard.Child=row;
    var dragArea=Cols(24,-1);dragArea.Background=Brushes.Transparent;dragArea.Cursor=Cursors.SizeAll;dragArea.ToolTip="拖动移动；双击展开；右键显示菜单";
    compactBadge=new Border{VerticalAlignment=VerticalAlignment.Center};At(dragArea,compactBadge,0);compactStatus=T("看球",10,Ink,true);compactStatus.TextWrapping=TextWrapping.NoWrap;compactStatus.TextTrimming=TextTrimming.CharacterEllipsis;At(dragArea,compactStatus,1);
@@ -253,7 +253,7 @@ namespace Touchline {
    UpdateCompact();
    UpdateFavoriteBadge();
    favoritesButton.Content="关注球队 · "+preferences.Favorites.TeamIds.Count;
-   foreach(var kv in tabs){kv.Value.Background=B(kv.Key==filter?"#27503F":"#1C2B33");kv.Value.Foreground=kv.Key==filter?Green:Muted;}
+   foreach(var kv in tabs){kv.Value.Background=B(kv.Key==filter?"#27503F":"#2A4045");kv.Value.Foreground=kv.Key==filter?Green:Muted;}
    var selected=results.Where(x=>(preferences.ShowCups||!League.IsCup(x.League.Id))&&(filter=="all"||x.League.Id==filter)).ToList();
    var shown=ScheduleView.Select(selected.SelectMany(x=>x.Matches),preferences.Favorites,filter,liveOnly);
    int playing=shown.Count(x=>x.State=="in");summary.Text=shown.Count+" 场比赛   ·   "+playing+" 场进行中";
@@ -298,7 +298,7 @@ namespace Touchline {
   }
   Border MatchCard(Match m,LeagueResult result) {
    bool open=m.Id==expanded,live=m.State=="in";
-   var outer=new Border{Background=B(open?"#20343B":"#1B2A32"),CornerRadius=new CornerRadius(11),BorderBrush=B(live?"#367C60":open?"#496771":"#293B44"),BorderThickness=new Thickness(1),Margin=new Thickness(0,0,0,9)};
+   var outer=new Border{Background=B(open?"#324B4E":"#293C40"),CornerRadius=new CornerRadius(11),BorderBrush=B(live?"#367C60":open?"#6A8587":"#465F63"),BorderThickness=new Thickness(1),Margin=new Thickness(0,0,0,9)};
    var stack=new StackPanel();outer.Child=stack;
    var body=new StackPanel{Margin=new Thickness(13,10,13,11)};
    var topline=Cols(-1,-1);var leagueLabel=T(result.League.Name+"  ·  "+(m.Note??m.Kickoff.ToOffset(TimeSpan.FromHours(8)).ToString("HH:mm")),10,B(result.League.Color),true);At(topline,leagueLabel,0);
@@ -337,9 +337,10 @@ namespace Touchline {
    favoriteBadge.Child=TeamBadge(team.Name,team.Logo,31,team.Id);favoriteBadge.ToolTip="首位关注 · "+Names.Team(team.Name);favoriteBadge.Visibility=Visibility.Visible;
   }
   FrameworkElement TeamBadge(string name,string logo,double size,string id) {
-   var badge=new Grid{Width=size,Height=size};badge.Children.Add(new Border{Background=B("#31444C"),CornerRadius=new CornerRadius(size/2),Child=new TextBlock{Text=String.IsNullOrEmpty(name)?"★":name.Substring(0,1),Foreground=Ink,TextAlignment=TextAlignment.Center,VerticalAlignment=VerticalAlignment.Center,FontWeight=FontWeights.Bold}});
-   FillBadge(badge,teamDirectory.Logos(id,logo),size);
-   return badge;
+   double inset=Math.Max(2,size*.08),inner=size-2*inset-2;
+   var badge=new Grid{Width=inner,Height=inner};badge.Children.Add(new TextBlock{Text=String.IsNullOrEmpty(name)?"★":name.Substring(0,1),Foreground=B("#36504A"),TextAlignment=TextAlignment.Center,VerticalAlignment=VerticalAlignment.Center,FontWeight=FontWeights.Bold});
+   FillBadge(badge,teamDirectory.Logos(id,logo),inner);
+   return new Border{Width=size,Height=size,Background=B("#F3F6F2"),BorderBrush=B("#CAD8D0"),BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(size*.25),Padding=new Thickness(inset),Child=badge};
   }
   async void FillBadge(Grid badge,IEnumerable<string> urls,double size) {
    var image=await badges.Load(urls).ConfigureAwait(false);if(image==null)return;
@@ -347,9 +348,15 @@ namespace Touchline {
    try {
     await badge.Dispatcher.InvokeAsync(()=>{
      if(exiting)return;
+     var backing=badge.Parent as Border;if(backing!=null)backing.Background=BadgeBackground(image);
      badge.Children.Clear();badge.Children.Add(new Image{Source=image,Width=size,Height=size,Stretch=Stretch.Uniform});
     }).Task.ConfigureAwait(false);
    }catch(System.Threading.Tasks.TaskCanceledException){} // Dispatcher is shutting down.
+  }
+  static SolidColorBrush BadgeBackground(BitmapSource image){
+   var converted=new FormatConvertedBitmap(image,PixelFormats.Bgra32,null,0);int stride=converted.PixelWidth*4;var pixels=new byte[stride*converted.PixelHeight];converted.CopyPixels(pixels,stride,0);int visible=0,light=0,dark=0;
+   for(int i=0;i<pixels.Length;i+=4){if(pixels[i+3]<128)continue;visible++;double luminance=.2126*pixels[i+2]+.7152*pixels[i+1]+.0722*pixels[i];if(luminance>210)light++;if(luminance<120)dark++;}
+   return (SolidColorBrush)B(visible>0&&light>visible*.75&&dark<visible*.1?"#536D68":"#F3F6F2");
   }
   FrameworkElement Team(string name,string logo,string id) {
    var s=new StackPanel{VerticalAlignment=VerticalAlignment.Center};
@@ -390,14 +397,14 @@ namespace Touchline {
    var bitmap=await badges.Load(teamDirectory.Logos(team.Id,team.Logo)).ConfigureAwait(false);
    try{await Dispatcher.InvokeAsync(()=>{
     if(exiting||request!=trayBadgeRequest)return;if(bitmap==null){trayBadgeKey=null;return;}
-    try{var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(bitmap));using(var stream=new MemoryStream()){encoder.Save(stream);stream.Position=0;using(var source=new System.Drawing.Bitmap(stream))using(var scaled=new System.Drawing.Bitmap(source,32,32)){var handle=scaled.GetHicon();try{using(var icon=System.Drawing.Icon.FromHandle(handle)){teamTrayIcon=(System.Drawing.Icon)icon.Clone();tray.Icon=teamTrayIcon;}}finally{DestroyIcon(handle);}}}}catch(Exception){trayBadgeKey=null;}
+    try{var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(bitmap));using(var stream=new MemoryStream()){encoder.Save(stream);stream.Position=0;using(var source=new System.Drawing.Bitmap(stream))using(var scaled=new System.Drawing.Bitmap(32,32)){using(var graphics=System.Drawing.Graphics.FromImage(scaled)){graphics.SmoothingMode=System.Drawing.Drawing2D.SmoothingMode.AntiAlias;graphics.Clear(System.Drawing.Color.Transparent);var color=BadgeBackground(bitmap).Color;using(var backing=new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb(color.R,color.G,color.B)))graphics.FillEllipse(backing,0,0,32,32);graphics.DrawImage(source,new System.Drawing.Rectangle(4,4,24,24));}var handle=scaled.GetHicon();try{using(var icon=System.Drawing.Icon.FromHandle(handle)){teamTrayIcon=(System.Drawing.Icon)icon.Clone();tray.Icon=teamTrayIcon;}}finally{DestroyIcon(handle);}}}}catch(Exception){trayBadgeKey=null;}
    }).Task.ConfigureAwait(false);}catch(System.Threading.Tasks.TaskCanceledException){}
   }
   [System.Runtime.InteropServices.DllImport("user32.dll")]static extern bool DestroyIcon(IntPtr icon);
   void ShowUpdates(){
    if(updateDialog!=null){updateDialog.Activate();return;}
    Hide();
-   var panel=new StackPanel{Margin=new Thickness(22)};var dialog=new Window{Title="看球更新",Width=390,SizeToContent=SizeToContent.Height,ResizeMode=ResizeMode.NoResize,Background=B("#182830"),Foreground=Ink,FontFamily=FontFamily,Content=panel,WindowStartupLocation=WindowStartupLocation.CenterScreen};updateDialog=dialog;dialog.Resources=Resources;
+   var panel=new StackPanel{Margin=new Thickness(22)};var dialog=new Window{Title="看球更新",Width=390,SizeToContent=SizeToContent.Height,ResizeMode=ResizeMode.NoResize,Background=B("#22373C"),Foreground=Ink,FontFamily=FontFamily,Content=panel,WindowStartupLocation=WindowStartupLocation.CenterScreen};updateDialog=dialog;dialog.Resources=Resources;
    panel.Children.Add(T("看球 · "+AppUpdater.CurrentVersion,19,Ink,true));var status=T(updater.Status,12,Muted);status.Margin=new Thickness(0,18,0,18);panel.Children.Add(status);
    var check=Btn("检查更新",async ()=>await updater.Check());panel.Children.Add(check);
    var install=Btn("下载更新",async ()=>{if(!updater.Ready){await updater.Download();return;}try{Save();updater.BeginInstall(true);dialog.Close();exiting=true;Close();}catch(Exception ex){MessageBox.Show(dialog,"更新未安装："+ex.Message,"看球更新");}});install.Margin=new Thickness(0,8,0,0);panel.Children.Add(install);
@@ -407,9 +414,9 @@ namespace Touchline {
   void ShowFavorites() {
    var panel=new Grid{Margin=new Thickness(20)};
    foreach(var height in new[]{GridLength.Auto,GridLength.Auto,GridLength.Auto,new GridLength(1,GridUnitType.Star),GridLength.Auto})panel.RowDefinitions.Add(new RowDefinition{Height=height});
-   var dialog=new Window{Title="关注球队",Owner=this,Width=400,Height=560,MinHeight=420,MinWidth=360,WindowStartupLocation=WindowStartupLocation.CenterOwner,Background=B("#182830"),Foreground=Ink,FontFamily=FontFamily,Content=panel,Topmost=Topmost};
+   var dialog=new Window{Title="关注球队",Owner=this,Width=400,Height=560,MinHeight=420,MinWidth=360,WindowStartupLocation=WindowStartupLocation.CenterOwner,Background=B("#22373C"),Foreground=Ink,FontFamily=FontFamily,Content=panel,Topmost=Topmost};
    var heading=T("关注你的球队",19,Ink,true);heading.Margin=new Thickness(0,0,0,14);panel.Children.Add(heading);
-   var search=new TextBox{FontSize=13,Padding=new Thickness(10,8,10,8),Background=B("#263B45"),Foreground=Ink,BorderBrush=B("#46606B"),CaretBrush=Ink,ToolTip="输入球队中文名或英文名"};Grid.SetRow(search,1);panel.Children.Add(search);
+   var search=new TextBox{FontSize=13,Padding=new Thickness(10,8,10,8),Background=B("#344E53"),Foreground=Ink,BorderBrush=B("#46606B"),CaretBrush=Ink,ToolTip="输入球队中文名或英文名"};Grid.SetRow(search,1);panel.Children.Add(search);
    var filterRow=Cols(-1,0);filterRow.ColumnDefinitions[1].Width=GridLength.Auto;filterRow.Margin=new Thickness(0,12,0,12);Grid.SetRow(filterRow,2);panel.Children.Add(filterRow);
    var count=T("",11,Green);At(filterRow,count,0);var selectedOnly=new CheckBox{Content="只显示已关注",Foreground=Muted,VerticalAlignment=VerticalAlignment.Center};At(filterRow,selectedOnly,1);
    var teams=new StackPanel();var scroller=new ScrollViewer{Content=teams,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};Grid.SetRow(scroller,3);panel.Children.Add(scroller);
@@ -440,7 +447,7 @@ namespace Touchline {
   }
   void ShowSettings() {
    var panel=new StackPanel{Margin=new Thickness(22)};
-   var dialog=new Window{Title="看球设置",Owner=this,Width=380,Height=Math.Min(660,SystemParameters.WorkArea.Height-40),ResizeMode=ResizeMode.NoResize,WindowStartupLocation=WindowStartupLocation.CenterOwner,Background=B("#182830"),Foreground=Ink,FontFamily=FontFamily,Content=new ScrollViewer{Content=panel,VerticalScrollBarVisibility=ScrollBarVisibility.Auto},Topmost=Topmost};
+   var dialog=new Window{Title="看球设置",Owner=this,Width=380,Height=Math.Min(660,SystemParameters.WorkArea.Height-40),ResizeMode=ResizeMode.NoResize,WindowStartupLocation=WindowStartupLocation.CenterOwner,Background=B("#22373C"),Foreground=Ink,FontFamily=FontFamily,Content=new ScrollViewer{Content=panel,VerticalScrollBarVisibility=ScrollBarVisibility.Auto},Topmost=Topmost};
    panel.Children.Add(T("让比分留在你身边",17,Ink,true));
    var startTray=new CheckBox{Content="启动时仅显示托盘图标",IsChecked=preferences.StartInTray,Foreground=Ink,Margin=new Thickness(0,18,0,12)};startTray.Click+=(s,e)=>{preferences.StartInTray=startTray.IsChecked==true;Save();UpdateTray();};panel.Children.Add(startTray);
    var cups=new CheckBox{Content="显示国内杯赛",IsChecked=preferences.ShowCups,Foreground=Ink,Margin=new Thickness(0,0,0,12)};cups.Click+=(s,e)=>SetCups(cups.IsChecked==true);panel.Children.Add(cups);
@@ -475,7 +482,7 @@ namespace Touchline {
    try{preferenceStore.Save(preferences);}catch(Exception){if(notice!=null){notice.Text="窗口设置未能保存，请检查本地目录权限。";noticeBox.Visibility=Visibility.Visible;noticeUntil=DateTimeOffset.UtcNow.AddMinutes(2);}}
   }
   const string Styles=@"<ResourceDictionary xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml'>
-  <Style TargetType='Button'><Setter Property='Foreground' Value='#CBD8DE'/><Setter Property='Background' Value='#22323A'/><Setter Property='BorderThickness' Value='0'/><Setter Property='FontFamily' Value='Microsoft YaHei UI'/><Setter Property='Template'><Setter.Value><ControlTemplate TargetType='Button'><Border x:Name='surface' Background='{TemplateBinding Background}' CornerRadius='6' Padding='{TemplateBinding Padding}'><ContentPresenter HorizontalAlignment='{TemplateBinding HorizontalContentAlignment}' VerticalAlignment='Center'/></Border><ControlTemplate.Triggers><Trigger Property='IsMouseOver' Value='True'><Setter TargetName='surface' Property='Opacity' Value='.75'/></Trigger><Trigger Property='IsEnabled' Value='False'><Setter TargetName='surface' Property='Opacity' Value='.4'/></Trigger><Trigger Property='IsKeyboardFocused' Value='True'><Setter TargetName='surface' Property='BorderBrush' Value='#63E7AE'/><Setter TargetName='surface' Property='BorderThickness' Value='1'/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter></Style>
+  <Style TargetType='Button'><Setter Property='Foreground' Value='#E0EAE7'/><Setter Property='Background' Value='#334A4E'/><Setter Property='BorderThickness' Value='0'/><Setter Property='FontFamily' Value='Microsoft YaHei UI'/><Setter Property='Template'><Setter.Value><ControlTemplate TargetType='Button'><Border x:Name='surface' Background='{TemplateBinding Background}' CornerRadius='6' Padding='{TemplateBinding Padding}'><ContentPresenter HorizontalAlignment='{TemplateBinding HorizontalContentAlignment}' VerticalAlignment='Center'/></Border><ControlTemplate.Triggers><Trigger Property='IsMouseOver' Value='True'><Setter TargetName='surface' Property='Opacity' Value='.75'/></Trigger><Trigger Property='IsEnabled' Value='False'><Setter TargetName='surface' Property='Opacity' Value='.4'/></Trigger><Trigger Property='IsKeyboardFocused' Value='True'><Setter TargetName='surface' Property='BorderBrush' Value='#63E7AE'/><Setter TargetName='surface' Property='BorderThickness' Value='1'/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter></Style>
   <Style x:Key='CardButton' TargetType='Button'><Setter Property='Template'><Setter.Value><ControlTemplate TargetType='Button'><Border x:Name='surface' Background='Transparent' CornerRadius='10'><ContentPresenter HorizontalAlignment='Stretch'/></Border><ControlTemplate.Triggers><Trigger Property='IsMouseOver' Value='True'><Setter TargetName='surface' Property='Background' Value='#102FE0AC'/></Trigger><Trigger Property='IsKeyboardFocused' Value='True'><Setter TargetName='surface' Property='BorderBrush' Value='#63E7AE'/><Setter TargetName='surface' Property='BorderThickness' Value='1'/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter></Style>
   <Style TargetType='ScrollBar'><Setter Property='Width' Value='5'/><Setter Property='Background' Value='Transparent'/><Setter Property='Template'><Setter.Value><ControlTemplate TargetType='ScrollBar'><Track x:Name='PART_Track' IsDirectionReversed='True' Orientation='{TemplateBinding Orientation}' Minimum='{TemplateBinding Minimum}' Maximum='{TemplateBinding Maximum}' Value='{Binding Value, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}' ViewportSize='{TemplateBinding ViewportSize}'><Track.DecreaseRepeatButton><RepeatButton Command='ScrollBar.PageUpCommand' Opacity='0'/></Track.DecreaseRepeatButton><Track.Thumb><Thumb><Thumb.Template><ControlTemplate TargetType='Thumb'><Border Background='#46606B' CornerRadius='3'/></ControlTemplate></Thumb.Template></Thumb></Track.Thumb><Track.IncreaseRepeatButton><RepeatButton Command='ScrollBar.PageDownCommand' Opacity='0'/></Track.IncreaseRepeatButton></Track></ControlTemplate></Setter.Value></Setter></Style>
  </ResourceDictionary>";
