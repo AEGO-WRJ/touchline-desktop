@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Documents;
 using System.Windows.Media;
 
 namespace Touchline {
@@ -12,6 +13,12 @@ namespace Touchline {
   readonly List<Marker> markers=new List<Marker>();
   readonly bool full;
   static Brush Color(string hex){return (Brush)new BrushConverter().ConvertFromString(hex);}
+  public static TextBlock PlayerLabel(MatchPlayer player,double size,Brush ink,bool bold){
+   var label=new TextBlock{FontSize=size,Foreground=ink,FontWeight=bold?FontWeights.Bold:FontWeights.Normal,TextWrapping=TextWrapping.Wrap};
+   if(player.SubbedIn)label.Inlines.Add(new Run("↑ "){Foreground=Color("#8FEDBD"),FontWeight=FontWeights.Bold});
+   if(player.SubbedOut)label.Inlines.Add(new Run("↓ "){Foreground=Color("#F3CF80"),FontWeight=FontWeights.Bold});
+   label.Inlines.Add(new Run(player.Name));return label;
+  }
   public PitchView(TeamSquad home,TeamSquad away,bool current,Action<MatchPlayer,bool> select){
    full=away!=null;ClipToBounds=true;Background=Color("#28694D");
    AddTeam(home,false,current,select);if(full)AddTeam(away,true,current,select);
@@ -23,7 +30,7 @@ namespace Touchline {
     var number=new TextBlock{Text=String.IsNullOrEmpty(p.Number)?"—":p.Number,FontSize=14,FontWeight=FontWeights.Bold,Foreground=Color(away?"#203B35":"#FFFFFF"),HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center};
     content.Children.Add(new Border{Width=34,Height=34,CornerRadius=new CornerRadius(17),Background=Color(away?"#F5F3DF":"#DA614F"),BorderBrush=Color("#F6F6E8"),BorderThickness=new Thickness(1.5),Child=number,HorizontalAlignment=HorizontalAlignment.Center});
     content.Children.Add(new Border{Width=32,Height=15,CornerRadius=new CornerRadius(4),Background=Color(p.Rating.HasValue?(p.Rating>=7?"#A3E8AF":"#F4D18A"):"#D2DCD1"),HorizontalAlignment=HorizontalAlignment.Center,Margin=new Thickness(0,1,0,2),Child=new TextBlock{Text=p.Rating.HasValue?p.Rating.Value.ToString("0.0",CultureInfo.InvariantCulture):"—",Foreground=Color("#17352A"),FontSize=10,FontWeight=FontWeights.Bold,TextAlignment=TextAlignment.Center}});
-    content.Children.Add(new TextBlock{Text=p.Name,FontSize=10,Foreground=Brushes.White,Background=Color("#7021372C"),TextAlignment=TextAlignment.Center,TextTrimming=TextTrimming.CharacterEllipsis,TextWrapping=TextWrapping.NoWrap});
+    var name=PlayerLabel(p,10,Brushes.White,false);name.Background=Color("#7021372C");name.TextAlignment=TextAlignment.Center;name.TextTrimming=TextTrimming.CharacterEllipsis;name.TextWrapping=TextWrapping.NoWrap;content.Children.Add(name);
     string status=p.SentOff?" · 红牌离场":p.SubbedOut?" · 已换下":p.SubbedIn?" · 替补上场":"";
     var button=new Button{Tag=p,Content=content,Height=68,Padding=new Thickness(0),BorderThickness=new Thickness(0),Background=Brushes.Transparent,Cursor=Cursors.Hand,ToolTip=p.Number+" · "+p.Name+"\n"+p.Position+status+"\n点击查看球员数据",HorizontalContentAlignment=HorizontalAlignment.Stretch,VerticalContentAlignment=VerticalAlignment.Top};
     var template=new ControlTemplate(typeof(Button));template.VisualTree=new FrameworkElementFactory(typeof(ContentPresenter));button.Template=template;

@@ -66,16 +66,16 @@ namespace Touchline {
    foreach(var p in players){
     string state=p.SentOff?"红牌离场":p.SubbedOut?"已换下":p.SubbedIn?"替补上场":p.Starter?"首发":"未上场";
     var row=Cols(31,-1,44);row.Margin=new Thickness(0,8,0,8);var number=T(String.IsNullOrEmpty(p.Number)?"—":p.Number,12,Muted,true);number.VerticalAlignment=VerticalAlignment.Center;At(row,number,0);
-    var name=new StackPanel();name.Children.Add(T(p.Name,11,Ink,true));name.Children.Add(T(p.Position+" · "+state,9,p.SentOff?Amber:Muted));At(row,name,1);
+    var name=new StackPanel();name.Children.Add(PitchView.PlayerLabel(p,11,Ink,true));name.Children.Add(T(p.Position+" · "+state,9,p.SentOff?Amber:Muted));At(row,name,1);
     var rating=T(p.Rating.HasValue?p.Rating.Value.ToString("0.0",CultureInfo.InvariantCulture):"—",13,p.Rating.HasValue?(p.Rating.Value>=7?Green:Ink):Muted,true);rating.VerticalAlignment=VerticalAlignment.Center;rating.ToolTip=p.Rating.HasValue?"FotMob 本场评分（10分制）":"暂无本场评分";At(row,rating,2);
     var button=new Button{Content=row,HorizontalContentAlignment=HorizontalAlignment.Stretch,Style=(Style)Resources["CardButton"],ToolTip="球员数据"};var player=p;button.Click+=(s,e)=>{selectedPlayer=selectedPlayer==player.Id?null:player.Id;RenderPlayers();};playerHost.Children.Add(button);
    }
    if(players.Count==0)playerHost.Children.Add(T("暂无此类球员记录",11,Muted));
-   var source=T("阵容 / 统计：ESPN · 站位 / 本场评分：FotMob\n换人沿用被换下球员位置；— 表示暂无评分。"+(String.IsNullOrEmpty(squad.RatingNote)?"":"\n"+squad.RatingNote),9,Muted);source.Margin=new Thickness(0,12,0,0);playerHost.Children.Add(source);
+   var source=T("↑ 换上 · ↓ 换下 · — 暂无评分\n阵容 / 统计：ESPN · 站位 / 本场评分：FotMob\n换人沿用被换下球员位置。"+(String.IsNullOrEmpty(squad.RatingNote)?"":"\n"+squad.RatingNote),9,Muted);source.Margin=new Thickness(0,12,0,0);playerHost.Children.Add(source);
   }
   FrameworkElement PlayerFacts(MatchPlayer p){
      var facts=new StackPanel{Margin=new Thickness(10,8,10,10)};
-     facts.Children.Add(T(p.Number+" · "+p.Name+" · "+p.Position,12,Ink,true));
+     facts.Children.Add(PitchView.PlayerLabel(p,12,Ink,true));facts.Children.Add(T(p.Number+"号 · "+p.Position,10,Muted));
      if(!String.IsNullOrEmpty(p.Age)||!String.IsNullOrEmpty(p.Country))facts.Children.Add(T((String.IsNullOrEmpty(p.Age)?"":p.Age+" 岁  ")+(p.Country??""),10,Muted));
      string[,] stats={{"totalGoals","进球"},{"goalAssists","助攻"},{"totalShots","射门"},{"shotsOnTarget","射正"},{"saves","扑救"},{"goalsConceded","失球"},{"foulsCommitted","犯规"},{"yellowCards","黄牌"},{"redCards","红牌"}};
      int visible=0;for(int n=0;n<stats.GetLength(0);n++){string value;if((stats[n,0]=="saves"||stats[n,0]=="goalsConceded")&&p.Position!="门将")continue;if(!p.Stats.TryGetValue(stats[n,0],out value))continue;var stat=Cols(-1,50);stat.Margin=new Thickness(0,3,0,3);At(stat,T(stats[n,1],10,Muted),0);At(stat,T(value,10,Ink),1);facts.Children.Add(stat);visible++;}
@@ -99,11 +99,11 @@ namespace Touchline {
    var homeLabel=new StackPanel{Orientation=Orientation.Horizontal};homeLabel.Children.Add(TeamBadge(home.Name,playerMatch.HomeLogo,30,playerMatch.HomeId));var hn=T("  ● "+Names.Team(home.Name),14,Ink,true);hn.VerticalAlignment=VerticalAlignment.Center;homeLabel.Children.Add(hn);At(header,homeLabel,0);
    var formations=T((String.IsNullOrEmpty(home.Formation)?"—":home.Formation)+"  vs  "+(String.IsNullOrEmpty(away.Formation)?"—":away.Formation)+"\n"+mode,12,Ink,true);formations.TextAlignment=TextAlignment.Center;At(header,formations,1);
    var awayLabel=new StackPanel{Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Right};var an=T(Names.Team(away.Name)+"  ○  ",14,Ink,true);an.VerticalAlignment=VerticalAlignment.Center;awayLabel.Children.Add(an);awayLabel.Children.Add(TeamBadge(away.Name,playerMatch.AwayLogo,30,playerMatch.AwayId));At(header,awayLabel,2);
-   var top=new StackPanel();top.Children.Add(header);var modes=new StackPanel{Orientation=Orientation.Horizontal,Margin=new Thickness(0,0,0,10)};modes.Children.Add(Btn(squad.State=="post"?"结束时在场":squad.State=="pre"?"赛前名单":"当前在场",()=>{lineupMode=0;RenderPlayers();}));modes.Children.Add(Btn("首发阵容",()=>{lineupMode=1;RenderPlayers();}));top.Children.Add(modes);root.Children.Add(top);
+   header.Margin=new Thickness(10,10,10,10);var top=new StackPanel();top.Children.Add(new Border{Background=BadgeSurface(),CornerRadius=new CornerRadius(9),Margin=new Thickness(0,0,0,10),Child=header});var modes=new StackPanel{Orientation=Orientation.Horizontal,Margin=new Thickness(0,0,0,10)};modes.Children.Add(Btn(squad.State=="post"?"结束时在场":squad.State=="pre"?"赛前名单":"当前在场",()=>{lineupMode=0;RenderPlayers();}));modes.Children.Add(Btn("首发阵容",()=>{lineupMode=1;RenderPlayers();}));top.Children.Add(modes);root.Children.Add(top);
    var chosen=(playerAway?away:home).Players.FirstOrDefault(p=>p.Id==selectedPlayer);
    var pitch=new PitchView(home,away,current,(p,isAway)=>{playerAway=isAway;selectedPlayer=p.Id;RenderPlayers();}){Height=Math.Max(440,pitchWindow.ActualHeight-220-(chosen!=null?180:0))};Grid.SetRow(pitch,1);root.Children.Add(pitch);
    int total=home.Players.Concat(away.Players).Count(p=>current?p.OnPitch:p.Starter),placed=PitchLayout.Build(home,current).Count+PitchLayout.Build(away,current).Count;
-   var caption=T((playerError==null?"":"连接异常 · 上次阵容 · ")+"阵型站位示意 · 主队珊瑚红 / 客队米白 · 点击球员查看详情\n换人沿用被换下球员位置，非实时跑位。"+(placed==0?" 暂无站位数据。":total>placed?" "+(total-placed)+" 人位置未提供，可在卡片名单查看。":"")+"  读取于 "+squad.Updated.ToOffset(TimeSpan.FromHours(8)).ToString("HH:mm:ss"),10,playerError==null?Muted:Amber);caption.Margin=new Thickness(0,10,0,8);Grid.SetRow(caption,2);root.Children.Add(caption);
+   var caption=T((playerError==null?"":"连接异常 · 上次阵容 · ")+"阵型站位示意 · 主队珊瑚红 / 客队米白 · ↑ 换上 · ↓ 换下 · 点击球员查看详情\n换人沿用被换下球员位置，非实时跑位。"+(placed==0?" 暂无站位数据。":total>placed?" "+(total-placed)+" 人位置未提供，可在卡片名单查看。":"")+"  读取于 "+squad.Updated.ToOffset(TimeSpan.FromHours(8)).ToString("HH:mm:ss"),10,playerError==null?Muted:Amber);caption.Margin=new Thickness(0,10,0,8);Grid.SetRow(caption,2);root.Children.Add(caption);
    if(chosen!=null){var details=new ScrollViewer{Content=PlayerFacts(chosen),MaxHeight=180,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};Grid.SetRow(details,3);root.Children.Add(details);}
    pitchWindow.Content=new ScrollViewer{Background=B("#1D2C30"),Content=root,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};
   }

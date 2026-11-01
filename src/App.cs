@@ -114,6 +114,7 @@ namespace Touchline {
   }
   static double Clamp(double x,double min,double max) { return Double.IsNaN(x)||Double.IsInfinity(x)?max:Math.Max(min,Math.Min(x,max)); }
   static Brush B(string hex) { return (Brush)new BrushConverter().ConvertFromString(hex); }
+  static Brush BadgeSurface(){return new LinearGradientBrush((Color)ColorConverter.ConvertFromString("#48FFFFFF"),(Color)ColorConverter.ConvertFromString("#18FFFFFF"),90);}
   static TextBlock T(string text,double size=12,Brush color=null,bool bold=false) {
    return new TextBlock{Text=text,FontSize=size,Foreground=color??Ink,FontWeight=bold?FontWeights.SemiBold:FontWeights.Normal,VerticalAlignment=VerticalAlignment.Center,TextWrapping=TextWrapping.Wrap};
   }
@@ -126,7 +127,7 @@ namespace Touchline {
   }
   static void At(Grid g,UIElement item,int column) { Grid.SetColumn(item,column);g.Children.Add(item); }
   void Build() {
-   var shell=new Border{Background=B("#1D2C30"),BorderBrush=B("#486166"),BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(18),Margin=new Thickness(8),Padding=new Thickness(18,17,18,12)};
+   var shell=new Border{Background=new LinearGradientBrush((Color)ColorConverter.ConvertFromString("#48595D"),(Color)ColorConverter.ConvertFromString("#1D2C30"),90),BorderBrush=B("#486166"),BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(18),Margin=new Thickness(8),Padding=new Thickness(18,17,18,12)};
    shell.Effect=new System.Windows.Media.Effects.DropShadowEffect{Color=Colors.Black,BlurRadius=14,Opacity=.35,ShadowDepth=3};fullCard=shell;viewHost=new Grid();viewHost.Children.Add(shell);Content=viewHost;
    var root=new Grid();shell.Child=root;
    foreach(var size in new[]{GridLength.Auto,GridLength.Auto,GridLength.Auto,GridLength.Auto,GridLength.Auto,GridLength.Auto,new GridLength(1,GridUnitType.Star),GridLength.Auto})root.RowDefinitions.Add(new RowDefinition{Height=size});
@@ -161,7 +162,7 @@ namespace Touchline {
    Render();
   }
   void BuildCompact() {
-   compactCard=new Border{Background=B("#243B40"),BorderBrush=B("#49606A"),BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(10),Margin=new Thickness(2),Padding=new Thickness(8,0,5,0),Visibility=Visibility.Collapsed};viewHost.Children.Add(compactCard);
+   compactCard=new Border{Background=new LinearGradientBrush((Color)ColorConverter.ConvertFromString("#C75C6D70"),(Color)ColorConverter.ConvertFromString("#E52C4247"),90),BorderBrush=B("#6E8387"),BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(10),Margin=new Thickness(2),Padding=new Thickness(8,0,5,0),Visibility=Visibility.Collapsed};viewHost.Children.Add(compactCard);
    var row=Cols(-1,30,38);compactCard.Child=row;
    var dragArea=Cols(24,-1);dragArea.Background=Brushes.Transparent;dragArea.Cursor=Cursors.SizeAll;dragArea.ToolTip="拖动移动；双击展开；右键显示菜单";
    compactBadge=new Border{VerticalAlignment=VerticalAlignment.Center};At(dragArea,compactBadge,0);compactStatus=T("看球",10,Ink,true);compactStatus.TextWrapping=TextWrapping.NoWrap;compactStatus.TextTrimming=TextTrimming.CharacterEllipsis;At(dragArea,compactStatus,1);
@@ -305,7 +306,7 @@ namespace Touchline {
    var status=T((m.DataStale?"缓存 · ":live?"● ":"")+m.Status,10,m.DataStale?Amber:live?Green:Muted);status.HorizontalAlignment=HorizontalAlignment.Right;At(topline,status,1);body.Children.Add(topline);
    var score=Cols(-1,76,-1);score.Margin=new Thickness(0,13,0,4);At(score,Team(m.Home,m.HomeLogo,m.HomeId),0);At(score,Team(m.Away,m.AwayLogo,m.AwayId),2);
    var center=new StackPanel{VerticalAlignment=VerticalAlignment.Center};var scoreText=T(m.State=="pre"?"VS":(m.HomeScore==""?"—":m.HomeScore)+" : "+(m.AwayScore==""?"—":m.AwayScore),m.State=="pre"?16:24,live?Green:Ink,true);scoreText.TextAlignment=TextAlignment.Center;center.Children.Add(scoreText);var hint=T(open?"收起  ⌃":"数据  ⌄",9,Muted);hint.TextAlignment=TextAlignment.Center;hint.Margin=new Thickness(0,5,0,0);center.Children.Add(hint);At(score,center,1);body.Children.Add(score);
-   var click=new Button{Content=body,Padding=new Thickness(0),Background=Brushes.Transparent,BorderThickness=new Thickness(0),HorizontalContentAlignment=HorizontalAlignment.Stretch,Cursor=Cursors.Hand,ToolTip="展开比赛数据"};click.Style=(Style)Resources["CardButton"];click.Click+=(s,e)=>{expanded=open?null:m.Id;Render();};stack.Children.Add(click);
+   var click=new Button{Content=new Border{Background=BadgeSurface(),CornerRadius=new CornerRadius(10),Child=body},Padding=new Thickness(0),Background=Brushes.Transparent,BorderThickness=new Thickness(0),HorizontalContentAlignment=HorizontalAlignment.Stretch,Cursor=Cursors.Hand,ToolTip="展开比赛数据"};click.Style=(Style)Resources["CardButton"];click.Click+=(s,e)=>{expanded=open?null:m.Id;Render();};stack.Children.Add(click);
    if(open) {
     var detail=new StackPanel{Margin=new Thickness(13,0,13,13)};detail.Children.Add(new Border{Height=1,Background=B("#37505A"),Margin=new Thickness(0,0,0,12)});
     var followRow=Cols(-1,-1);followRow.Margin=new Thickness(0,0,0,12);At(followRow,FollowButton(m.HomeId,"主队"),0);At(followRow,FollowButton(m.AwayId,"客队"),1);detail.Children.Add(followRow);
@@ -337,10 +338,9 @@ namespace Touchline {
    favoriteBadge.Child=TeamBadge(team.Name,team.Logo,31,team.Id);favoriteBadge.ToolTip="首位关注 · "+Names.Team(team.Name);favoriteBadge.Visibility=Visibility.Visible;
   }
   FrameworkElement TeamBadge(string name,string logo,double size,string id) {
-   double inset=Math.Max(2,size*.08),inner=size-2*inset-2;
-   var badge=new Grid{Width=inner,Height=inner};badge.Children.Add(new TextBlock{Text=String.IsNullOrEmpty(name)?"★":name.Substring(0,1),Foreground=B("#36504A"),TextAlignment=TextAlignment.Center,VerticalAlignment=VerticalAlignment.Center,FontWeight=FontWeights.Bold});
-   FillBadge(badge,teamDirectory.Logos(id,logo),inner);
-   return new Border{Width=size,Height=size,Background=B("#F3F6F2"),BorderBrush=B("#CAD8D0"),BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(size*.25),Padding=new Thickness(inset),Child=badge};
+   var badge=new Grid{Width=size,Height=size};badge.Children.Add(new TextBlock{Text=String.IsNullOrEmpty(name)?"★":name.Substring(0,1),Foreground=Ink,TextAlignment=TextAlignment.Center,VerticalAlignment=VerticalAlignment.Center,FontWeight=FontWeights.Bold});
+   FillBadge(badge,teamDirectory.Logos(id,logo),size);
+   return badge;
   }
   async void FillBadge(Grid badge,IEnumerable<string> urls,double size) {
    var image=await badges.Load(urls).ConfigureAwait(false);if(image==null)return;
@@ -348,15 +348,9 @@ namespace Touchline {
    try {
     await badge.Dispatcher.InvokeAsync(()=>{
      if(exiting)return;
-     var backing=badge.Parent as Border;if(backing!=null)backing.Background=BadgeBackground(image);
      badge.Children.Clear();badge.Children.Add(new Image{Source=image,Width=size,Height=size,Stretch=Stretch.Uniform});
     }).Task.ConfigureAwait(false);
    }catch(System.Threading.Tasks.TaskCanceledException){} // Dispatcher is shutting down.
-  }
-  static SolidColorBrush BadgeBackground(BitmapSource image){
-   var converted=new FormatConvertedBitmap(image,PixelFormats.Bgra32,null,0);int stride=converted.PixelWidth*4;var pixels=new byte[stride*converted.PixelHeight];converted.CopyPixels(pixels,stride,0);int visible=0,light=0,dark=0;
-   for(int i=0;i<pixels.Length;i+=4){if(pixels[i+3]<128)continue;visible++;double luminance=.2126*pixels[i+2]+.7152*pixels[i+1]+.0722*pixels[i];if(luminance>210)light++;if(luminance<120)dark++;}
-   return (SolidColorBrush)B(visible>0&&light>visible*.75&&dark<visible*.1?"#536D68":"#F3F6F2");
   }
   FrameworkElement Team(string name,string logo,string id) {
    var s=new StackPanel{VerticalAlignment=VerticalAlignment.Center};
@@ -397,7 +391,7 @@ namespace Touchline {
    var bitmap=await badges.Load(teamDirectory.Logos(team.Id,team.Logo)).ConfigureAwait(false);
    try{await Dispatcher.InvokeAsync(()=>{
     if(exiting||request!=trayBadgeRequest)return;if(bitmap==null){trayBadgeKey=null;return;}
-    try{var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(bitmap));using(var stream=new MemoryStream()){encoder.Save(stream);stream.Position=0;using(var source=new System.Drawing.Bitmap(stream))using(var scaled=new System.Drawing.Bitmap(32,32)){using(var graphics=System.Drawing.Graphics.FromImage(scaled)){graphics.SmoothingMode=System.Drawing.Drawing2D.SmoothingMode.AntiAlias;graphics.Clear(System.Drawing.Color.Transparent);var color=BadgeBackground(bitmap).Color;using(var backing=new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb(color.R,color.G,color.B)))graphics.FillEllipse(backing,0,0,32,32);graphics.DrawImage(source,new System.Drawing.Rectangle(4,4,24,24));}var handle=scaled.GetHicon();try{using(var icon=System.Drawing.Icon.FromHandle(handle)){teamTrayIcon=(System.Drawing.Icon)icon.Clone();tray.Icon=teamTrayIcon;}}finally{DestroyIcon(handle);}}}}catch(Exception){trayBadgeKey=null;}
+    try{var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(bitmap));using(var stream=new MemoryStream()){encoder.Save(stream);stream.Position=0;using(var source=new System.Drawing.Bitmap(stream))using(var scaled=new System.Drawing.Bitmap(source,32,32)){var handle=scaled.GetHicon();try{using(var icon=System.Drawing.Icon.FromHandle(handle)){teamTrayIcon=(System.Drawing.Icon)icon.Clone();tray.Icon=teamTrayIcon;}}finally{DestroyIcon(handle);}}}}catch(Exception){trayBadgeKey=null;}
    }).Task.ConfigureAwait(false);}catch(System.Threading.Tasks.TaskCanceledException){}
   }
   [System.Runtime.InteropServices.DllImport("user32.dll")]static extern bool DestroyIcon(IntPtr icon);
@@ -439,7 +433,7 @@ namespace Touchline {
       var up=Btn("↑",()=>{preferences.Favorites.Move(team.Id,-1);PersistFavorites();Render();draw();},"上移关注顺序");up.IsEnabled=preferences.Favorites.TeamIds.IndexOf(team.Id)>0;up.Padding=new Thickness(7,6,7,6);arrows.Children.Add(up);
       var down=Btn("↓",()=>{preferences.Favorites.Move(team.Id,1);PersistFavorites();Render();draw();},"下移关注顺序");down.IsEnabled=preferences.Favorites.TeamIds.IndexOf(team.Id)<preferences.Favorites.TeamIds.Count-1;down.Padding=new Thickness(7,6,7,6);arrows.Children.Add(down);At(teamRow,arrows,1);
      }
-     teams.Children.Add(teamRow);
+     teams.Children.Add(new Border{Background=BadgeSurface(),CornerRadius=new CornerRadius(8),Margin=new Thickness(0,0,0,6),Child=teamRow});
     }
     if(found.Count==0){var empty=T("没有找到球队，试试其他名称。",12,Muted);empty.Margin=new Thickness(5,20,5,20);teams.Children.Add(empty);}
    };
