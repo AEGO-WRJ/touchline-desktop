@@ -8,7 +8,7 @@ using System.Web.Script.Serialization;
 namespace Touchline {
  public class Match {
   public string Id, League, Home, Away, HomeId, AwayId, HomeLogo, AwayLogo, State, StatusName, Clock, Status;
-  public string HomeScore, AwayScore, Venue, Note;
+  public string HomeScore, AwayScore, Venue, Note, Round;
   public DateTimeOffset Kickoff;
   public bool DataStale;
   public DateTimeOffset? DataUpdated;

@@ -84,7 +84,7 @@ namespace Touchline {
    if(!String.IsNullOrEmpty(favoriteStore.Warning)){notice.Text=favoriteStore.Warning;notice.Foreground=Amber;noticeBox.Visibility=Visibility.Visible;noticeUntil=DateTimeOffset.UtcNow.AddMinutes(2);}
    timer.Interval=TimeSpan.FromSeconds(1);timer.Tick+=async (s,e)=>{
     if(noticeBox.Visibility==Visibility.Visible && DateTimeOffset.UtcNow>noticeUntil) noticeBox.Visibility=Visibility.Collapsed;
-    if(CanRefresh){AdvanceDay();SyncPlayers();if(DateTimeOffset.UtcNow>=due&&!loading)await Refresh();}
+    if(CanRefresh){if(boardWindow!=null&&boardRequest==null&&DateTimeOffset.UtcNow>=boardDue)LoadBoard(false);AdvanceDay();SyncPlayers();if(DateTimeOffset.UtcNow>=due&&!loading)await Refresh();}
     if(!exiting)await updater.Tick();
    };timer.Start();
    IsVisibleChanged+=(s,e)=>SyncRefresh();
@@ -98,7 +98,7 @@ namespace Touchline {
   public void Start(){if(!preferences.StartInTray)ShowCard(false);else{footer.Text="已暂停刷新 · 展开完整卡片后同步";UpdateTray();}}
   bool CanRefresh {get{return IsVisible&&!preferences.Compact&&!suspended&&!exiting&&WindowState!=WindowState.Minimized;}}
   void AdvanceDay(){var today=MatchData.BeijingToday;if(day==today)return;if(rangeStart==day){rangeStart=today;rangeEnd=today.AddDays(6);}day=today;due=DateTimeOffset.MinValue;Render();}
-  void PauseRequests(){if(!CanRefresh)ClosePitch();CancelPlayers();var active=refreshCancel;refreshCancel=null;if(active!=null)active.Cancel();loading=false;refreshAgain=false;forceNext=false;if(refreshButton!=null)refreshButton.IsEnabled=true;}
+  void PauseRequests(){CancelRounds();if(!CanRefresh){ClosePitch();CloseBoard();}CancelPlayers();var active=refreshCancel;refreshCancel=null;if(active!=null)active.Cancel();loading=false;refreshAgain=false;forceNext=false;if(refreshButton!=null)refreshButton.IsEnabled=true;}
   void SyncRefresh(bool force=false){
    bool active=CanRefresh;
    if(!active){refreshVisible=false;PauseRequests();if(footer!=null)footer.Text="已暂停刷新 · 展开完整卡片后同步";}
@@ -155,9 +155,9 @@ namespace Touchline {
    cupsToggle=new CheckBox{Content="显示杯赛",IsChecked=preferences.ShowCups,Foreground=Ink,FontSize=11,VerticalAlignment=VerticalAlignment.Center};cupsToggle.Click+=(s,e)=>SetCups(cupsToggle.IsChecked==true);At(options,cupsToggle,1);
    list=new StackPanel();scroll=new ScrollViewer{Content=list,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled,Padding=new Thickness(0,0,3,0)};Grid.SetRow(scroll,6);root.Children.Add(scroll);
    var bottom=new StackPanel{Margin=new Thickness(0,12,0,0)};Grid.SetRow(bottom,7);root.Children.Add(bottom);
-   var footRow=Cols(-1,0,0);footRow.ColumnDefinitions[1].Width=GridLength.Auto;footRow.ColumnDefinitions[2].Width=GridLength.Auto;bottom.Children.Add(footRow);
+   var footRow=Cols(-1,0,0,0);footRow.ColumnDefinitions[3].Width=GridLength.Auto;footRow.ColumnDefinitions[1].Width=GridLength.Auto;footRow.ColumnDefinitions[2].Width=GridLength.Auto;bottom.Children.Add(footRow);
    footer=T("正在连接 ESPN…",10,Muted);At(footRow,footer,0);refreshButton=Btn("↻",async ()=>await Refresh(true),"立即刷新全部已加载赛程");refreshButton.Padding=new Thickness(8,3,8,3);At(footRow,refreshButton,1);
-   var settings=Btn("设置",ShowSettings);settings.FontSize=10;settings.Padding=new Thickness(7,4,7,4);At(footRow,settings,2);
+   var settings=Btn("设置",ShowSettings);settings.FontSize=10;settings.Padding=new Thickness(7,4,7,4);At(footRow,settings,2);var boards=Btn("榜单",ShowBoard);boards.FontSize=10;boards.Padding=new Thickness(7,4,7,4);At(footRow,boards,3);
    var source=T("数据：ESPN · 可能延迟 · 点击比赛查看数据",9,B("#758A94"));source.Margin=new Thickness(0,6,0,0);bottom.Children.Add(source);
    Render();
   }
@@ -229,7 +229,7 @@ namespace Touchline {
    try {
     var incoming=await feed.LoadRange(requestedStart,requestedEnd,force,preferences.ShowCups,request.Token);request.Token.ThrowIfCancellationRequested();if(!CanRefresh)return;
     if(rangeStart==requestedStart&&rangeEnd==requestedEnd) {
-     results=incoming;
+     results=incoming;foreach(var match in incoming.SelectMany(x=>x.Matches)){string label;if(roundLabels.TryGetValue(match.Id,out label))match.Round=label;}
      var fresh=incoming.SelectMany(x=>x.Matches).Where(x=>!x.DataStale).ToList();teamDirectory.Learn(fresh);
      if(requestedStart<=MatchData.BeijingToday&&requestedEnd>=MatchData.BeijingToday) {
       var changes=tracker.Observe(fresh);
@@ -240,6 +240,7 @@ namespace Touchline {
       }
      }
      Render();
+     RefreshRounds(incoming);
     }
    } catch(OperationCanceledException) {} catch(Exception) { footer.Text="同步失败，稍后自动重试";footer.Foreground=Amber; }
    finally {
@@ -303,7 +304,7 @@ namespace Touchline {
    var stack=new StackPanel();outer.Child=stack;
    var body=new StackPanel{Margin=new Thickness(13,10,13,11)};
    var topline=Cols(-1,-1);var leagueLabel=T(result.League.Name+"  ·  "+(m.Note??m.Kickoff.ToOffset(TimeSpan.FromHours(8)).ToString("HH:mm")),10,B(result.League.Color),true);At(topline,leagueLabel,0);
-   var status=T((m.DataStale?"缓存 · ":live?"● ":"")+m.Status,10,m.DataStale?Amber:live?Green:Muted);status.HorizontalAlignment=HorizontalAlignment.Right;At(topline,status,1);body.Children.Add(topline);
+   var status=T((m.DataStale?"缓存 · ":live?"● ":"")+m.Status,10,m.DataStale?Amber:live?Green:Muted);status.HorizontalAlignment=HorizontalAlignment.Right;At(topline,status,1);body.Children.Add(topline);var round=T(String.IsNullOrEmpty(m.Round)?"轮次待提供":m.Round,10,Muted);round.Margin=new Thickness(0,5,0,0);body.Children.Add(round);
    var score=Cols(-1,76,-1);score.Margin=new Thickness(0,13,0,4);At(score,Team(m.Home,m.HomeLogo,m.HomeId),0);At(score,Team(m.Away,m.AwayLogo,m.AwayId),2);
    var center=new StackPanel{VerticalAlignment=VerticalAlignment.Center};var scoreText=T(m.State=="pre"?"VS":(m.HomeScore==""?"—":m.HomeScore)+" : "+(m.AwayScore==""?"—":m.AwayScore),m.State=="pre"?16:24,live?Green:Ink,true);scoreText.TextAlignment=TextAlignment.Center;center.Children.Add(scoreText);var hint=T(open?"收起  ⌃":"数据  ⌄",9,Muted);hint.TextAlignment=TextAlignment.Center;hint.Margin=new Thickness(0,5,0,0);center.Children.Add(hint);At(score,center,1);body.Children.Add(score);
    var click=new Button{Content=new Border{Background=BadgeSurface(),CornerRadius=new CornerRadius(10),Child=body},Padding=new Thickness(0),Background=Brushes.Transparent,BorderThickness=new Thickness(0),HorizontalContentAlignment=HorizontalAlignment.Stretch,Cursor=Cursors.Hand,ToolTip="展开比赛数据"};click.Style=(Style)Resources["CardButton"];click.Click+=(s,e)=>{expanded=open?null:m.Id;Render();};stack.Children.Add(click);
@@ -374,7 +375,7 @@ namespace Touchline {
    trayPin=TrayItem(menu,"窗口置顶",()=>{Topmost=!Topmost;pinButton.Content=Topmost?"已置顶":"置顶";Save();UpdateTray();});
    TrayItem(menu,"关注球队…",()=>{ShowCard();ShowFavorites();});TrayItem(menu,"打开卡片并刷新",OpenAndRefresh);
    trayStartup=TrayItem(menu,"启动时仅显示托盘图标",()=>{preferences.StartInTray=!preferences.StartInTray;Save();UpdateTray();});
-   TrayItem(menu,"设置…",()=>{ShowCard();ShowSettings();});trayUpdates=TrayItem(menu,"检查更新…",ShowUpdates);
+   TrayItem(menu,"联赛榜单…",ShowBoard);TrayItem(menu,"设置…",()=>{ShowCard();ShowSettings();});trayUpdates=TrayItem(menu,"检查更新…",ShowUpdates);
    menu.Items.Add(new Forms.ToolStripSeparator());TrayItem(menu,"退出看球",Quit);menu.Opening+=(s,e)=>UpdateTray();UpdateTray();
   }
   Forms.ToolStripMenuItem TrayItem(Forms.ContextMenuStrip menu,string title,Action action){var item=new Forms.ToolStripMenuItem(title);item.Click+=(s,e)=>Dispatcher.Invoke(action);menu.Items.Add(item);return item;}
