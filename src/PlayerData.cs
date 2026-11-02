@@ -76,7 +76,7 @@ namespace Touchline {
    switch(key){case "tottenham":value="Tottenham Hotspur";break;case "brighton":value="Brighton & Hove Albion";break;case "wolves":value="Wolverhampton Wanderers";break;case "newcastle":value="Newcastle United";break;case "inter":value="Internazionale";break;case "psg":value="Paris Saint-Germain";break;case "bayernmunchen":value="Bayern Munich";break;case "atleticomadrid":value="Atlético Madrid";break;case "athleticclub":case "athleticbilbao":value="Athletic Club";break;}
    return Normalize(Names.Team(value));
   }
-  static string LeagueId(string league){switch(league){case "eng.1":return "47";case "esp.1":return "87";case "ger.1":return "54";case "ita.1":return "55";case "fra.1":return "53";case "uefa.champions":return "42";case "eng.fa":return "132";case "eng.league_cup":return "133";case "ger.dfb_pokal":return "209";case "esp.copa_del_rey":return "138";default:return "";}}
+  static string LeagueId(string league){switch(league){case "usa.1":return "130";case "chn.1":return "120";case "eng.1":return "47";case "esp.1":return "87";case "ger.1":return "54";case "ita.1":return "55";case "fra.1":return "53";case "uefa.champions":return "42";case "eng.fa":return "132";case "eng.league_cup":return "133";case "ger.dfb_pokal":return "209";case "esp.copa_del_rey":return "138";default:return "";}}
   static bool SameFixture(object home,object away,string time,Match m){
    DateTimeOffset date;return DateTimeOffset.TryParse(time,CultureInfo.InvariantCulture,DateTimeStyles.AssumeUniversal,out date)&&Math.Abs((date-m.Kickoff).TotalMinutes)<=5&&TeamKey(Str(home,"name"))==TeamKey(m.Home)&&TeamKey(Str(away,"name"))==TeamKey(m.Away);
   }

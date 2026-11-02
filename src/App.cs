@@ -143,7 +143,7 @@ namespace Touchline {
    var previous=Btn("‹",()=>SelectDate(rangeStart.AddDays(-7)),"上一周");previous.Padding=new Thickness(5);dates.Children.Add(previous);var next=Btn("›",()=>SelectDate(rangeStart.AddDays(7)),"下一周");next.Padding=new Thickness(5);dates.Children.Add(next);
    datePicker=new DatePicker{SelectedDate=rangeStart,Width=108,FontSize=10,VerticalAlignment=VerticalAlignment.Center,ToolTip="选择赛程起始日期（北京时间）"};datePicker.SelectedDateChanged+=(s,e)=>{if(!updatingDate&&datePicker.SelectedDate.HasValue)SelectDate(datePicker.SelectedDate.Value);};dates.Children.Add(datePicker);At(dateBar,dates,0);
    favoritesButton=Btn("关注球队",ShowFavorites,"添加或取消关注球队，支持多选");At(dateBar,favoritesButton,1);
-   var filterPanel=new StackPanel{Margin=new Thickness(0,0,0,13)};Grid.SetRow(filterPanel,2);root.Children.Add(filterPanel);var filters=new UniformGrid{Columns=7};filterPanel.Children.Add(filters);
+   var filterPanel=new StackPanel{Margin=new Thickness(0,0,0,13)};Grid.SetRow(filterPanel,2);root.Children.Add(filterPanel);var filters=new UniformGrid{Columns=5};filterPanel.Children.Add(filters);
    AddTab(filters,"all","全部");foreach(var league in League.Regular) AddTab(filters,league.Id,league.Name);
    cupTabs=new UniformGrid{Columns=4,Margin=new Thickness(0,5,0,0)};filterPanel.Children.Add(cupTabs);foreach(var league in League.Cups)AddTab(cupTabs,league.Id,league.Name);
    var line=Cols(-1,0);line.ColumnDefinitions[1].Width=GridLength.Auto;Grid.SetRow(line,3);line.Margin=new Thickness(0,0,0,12);root.Children.Add(line);
@@ -275,7 +275,7 @@ namespace Touchline {
    if(shown.Count==0) {
     bool noFavorites=preferences.Favorites.OnlyFavorites&&preferences.Favorites.TeamIds.Count==0;
     string heading=noFavorites?"还没有关注球队":results.Length==0?"正在寻找比赛…":selected.Any(x=>x.Stale)?"赛程暂未同步":liveOnly?"现在没有进行中的比赛":"暂无符合筛选的赛程";
-    string body=noFavorites?"点击上方“关注球队”，添加你喜欢的球队。":results.Length==0?"按时间连续查看五大联赛与欧冠。":selected.Any(x=>x.Stale)?"网络或数据源暂时不可用。将自动重试，也可点击右下角刷新。":liveOnly?"关闭“只看进行中”，查看完整赛程。":"可继续加载更多日期，或调整筛选条件。";
+    string body=noFavorites?"点击上方“关注球队”，添加你喜欢的球队。":results.Length==0?"按时间连续查看五大联赛、欧冠、美职联和中超。":selected.Any(x=>x.Stale)?"网络或数据源暂时不可用。将自动重试，也可点击右下角刷新。":liveOnly?"关闭“只看进行中”，查看完整赛程。":"可继续加载更多日期，或调整筛选条件。";
     var empty=new StackPanel{Margin=new Thickness(12,24,12,25)};var mark=T(noFavorites?"☆":"⚽",34,Green);mark.HorizontalAlignment=HorizontalAlignment.Center;empty.Children.Add(mark);
     var h=T(heading,16,Ink,true);h.TextAlignment=TextAlignment.Center;h.Margin=new Thickness(0,18,0,10);empty.Children.Add(h);var text=T(body,12,Muted);text.TextAlignment=TextAlignment.Center;empty.Children.Add(text);list.Children.Add(empty);
    }

@@ -1,10 +1,10 @@
 # 看球 · Touchline
 
-Windows / macOS 桌面足球卡片：五大联赛、欧冠、足总杯、英格兰联赛杯、德国杯和国王杯。
+Windows / macOS 桌面足球卡片：五大联赛、欧冠、足总杯、英格兰联赛杯、德国杯和国王杯。Windows 还支持美职联和中超。
 
 | 平台 | 下载 | 系统 |
 | --- | --- | --- |
-| Windows | [Windows 版](https://github.com/AEGO-WRJ/touchline-desktop/releases/tag/v1.5.1-windows.1) → `Touchline.exe` | Windows 10/11 |
+| Windows | [Windows 版](https://github.com/AEGO-WRJ/touchline-desktop/releases/tag/v1.6.0-windows.1) → `Touchline.exe` | Windows 10/11 |
 | macOS | [Mac 版](https://github.com/AEGO-WRJ/touchline-desktop/releases/tag/v1.3.3-macos.1) → `Touchline-macOS-universal.zip` | macOS 13+，Apple Silicon / Intel |
 
 Windows 双击运行；Mac 解压后放入“应用程序”。两个版本默认驻留托盘或菜单栏，点击图标显示卡片。Windows 1.2.0 及更早版本需手动替换一次，此后支持应用内更新。[Mac 首次安装与详细说明](macos/README.md)。

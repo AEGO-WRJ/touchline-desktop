@@ -7,7 +7,73 @@ namespace Touchline {
    foreach(var line in Map.Split('\n')) { var pair=line.Trim().Split('|'); if(pair.Length==2) Teams[pair[0]]=pair[1]; }
   }
   public static string Team(string name) { string value;return name!=null && Teams.TryGetValue(name,out value)?value:name??"待定"; }
-  const string Map=@"AJ Auxerre|欧塞尔
+  const string Map=@"Atlanta United FC|亚特兰大联
+Atlanta United|亚特兰大联
+Austin FC|奥斯汀FC
+CF Montréal|蒙特利尔
+CF Montreal|蒙特利尔
+Charlotte FC|夏洛特FC
+Chicago Fire FC|芝加哥火焰
+Chicago Fire|芝加哥火焰
+Colorado Rapids|科罗拉多急流
+Columbus Crew|哥伦布机员
+D.C. United|华盛顿联
+DC United|华盛顿联
+FC Cincinnati|辛辛那提FC
+FC Dallas|达拉斯FC
+Houston Dynamo FC|休斯敦迪纳摩
+Houston Dynamo|休斯敦迪纳摩
+Inter Miami CF|迈阿密国际
+Inter Miami|迈阿密国际
+LA Galaxy|洛杉矶银河
+LAFC|洛杉矶FC
+Los Angeles FC|洛杉矶FC
+Minnesota United FC|明尼苏达联
+Minnesota United|明尼苏达联
+Nashville SC|纳什维尔SC
+New England Revolution|新英格兰革命
+New York City FC|纽约城
+Orlando City SC|奥兰多城
+Orlando City|奥兰多城
+Philadelphia Union|费城联合
+Portland Timbers|波特兰伐木工
+Real Salt Lake|皇家盐湖城
+Red Bull New York|纽约红牛
+New York Red Bulls|纽约红牛
+San Diego FC|圣迭戈FC
+San Jose Earthquakes|圣何塞地震
+Seattle Sounders FC|西雅图海湾人
+Seattle Sounders|西雅图海湾人
+Sporting Kansas City|堪萨斯城竞技
+St. Louis CITY SC|圣路易斯城
+St. Louis City|圣路易斯城
+Toronto FC|多伦多FC
+Vancouver Whitecaps|温哥华白浪
+Vancouver Whitecaps FC|温哥华白浪
+Beijing Guoan|北京国安
+Chengdu Rongcheng|成都蓉城
+Chengdu Rongcheng FC|成都蓉城
+Chongqing Tonglianglong|重庆铜梁龙
+Chongqing Tongliang Long|重庆铜梁龙
+Dalian Yingbo|大连英博
+Henan|河南
+Henan FC|河南
+Liaoning Tieren|辽宁铁人
+Qingdao Hainiu|青岛海牛
+Qingdao West Coast|青岛西海岸
+Shandong Taishan|山东泰山
+Shanghai Port FC|上海海港
+Shanghai Port|上海海港
+Shanghai Shenhua FC|上海申花
+Shanghai Shenhua|上海申花
+Shenzhen Xinpengcheng|深圳新鹏城
+Shenzhen Peng City|深圳新鹏城
+Tianjin Jinmen Tiger|天津津门虎
+Wuhan Three Towns|武汉三镇
+Yunnan Yukun|云南玉昆
+Zhejiang Professional FC|浙江
+Zhejiang Professional|浙江
+AJ Auxerre|欧塞尔
 Le Mans|勒芒
 Stade Rennais|雷恩
 AEK Athens|雅典AEK

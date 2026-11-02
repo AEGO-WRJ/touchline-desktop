@@ -11,7 +11,7 @@ namespace Touchline {
  public class League {
   public string Id, Name, Color;
   public League(string id,string name,string color) { Id=id;Name=name;Color=color; }
-  public static readonly League[] Regular={new League("eng.1","英超","#A795FF"),new League("esp.1","西甲","#FF987C"),new League("ita.1","意甲","#6FB7FF"),new League("ger.1","德甲","#FF7898"),new League("fra.1","法甲","#F3CE68"),new League("uefa.champions","欧冠","#83AFFF")};
+  public static readonly League[] Regular={new League("eng.1","英超","#A795FF"),new League("esp.1","西甲","#FF987C"),new League("ita.1","意甲","#6FB7FF"),new League("ger.1","德甲","#FF7898"),new League("fra.1","法甲","#F3CE68"),new League("uefa.champions","欧冠","#83AFFF"),new League("usa.1","美职联","#8DCEFF"),new League("chn.1","中超","#FFB47B")};
   public static readonly League[] Cups={new League("eng.fa","英足总杯","#F1C779"),new League("eng.league_cup","英联赛杯","#63E7AE"),new League("ger.dfb_pokal","德国杯","#F1C779"),new League("esp.copa_del_rey","国王杯","#FF987C")};
   public static readonly League[] All=Regular.Concat(Cups).ToArray();
   public static bool IsCup(string id){return Cups.Any(x=>x.Id==id);}

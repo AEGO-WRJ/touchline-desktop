@@ -790,5 +790,281 @@
     "Name": "Villarreal",
     "League": "uefa.champions",
     "Logo": "https://a.espncdn.com/i/teamlogos/soccer/500/102.png"
+  },
+  {
+    "Id": "18418",
+    "Name": "Atlanta United FC",
+    "League": "usa.1",
+    "Logo": "https://a.espncdn.com/i/teamlogos/soccer/500/18418.png"
+  },
+  {
+    "Id": "20906",
+    "Name": "Austin FC",
+    "League": "usa.1",
+    "Logo": "https://a.espncdn.com/i/teamlogos/soccer/500/20906.png"
+  },
+  {
+    "Id": "9720",
+    "Name": "CF Montréal",
+    "League": "usa.1",
+    "Logo": "https://a.espncdn.com/i/teamlogos/soccer/500/9720.png"
+  },
+  {
+    "Id": "21300",
+    "Name": "Charlotte FC",
+    "League": "usa.1",
+    "Logo": "https://a.espncdn.com/i/teamlogos/soccer/500/21300.png"
+  },
+  {
+    "Id": "182",
+    "Name": "Chicago Fire FC",
+    "League": "usa.1",
+    "Logo": "https://a.espncdn.com/i/teamlogos/soccer/500/182.png"
+  },
+  {
+    "Id": "184",
+    "Name": "Colorado Rapids",
+    "League": "usa.1",
+    "Logo": "https://a.espncdn.com/i/teamlogos/soccer/500/184.png"
+  },
+  {
+    "Id": "183",
+    "Name": "Columbus Crew",
+    "League": "usa.1",
+    "Logo": "https://a.espncdn.com/i/teamlogos/soccer/500/183.png"
+  },
+  {
+    "Id": "193",
+    "Name": "D.C. United",
+    "League": "usa.1",
+    "Logo": "https://a.espncdn.com/i/teamlogos/soccer/500/193.png"
+  },
+  {
+    "Id": "18267",
+    "Name": "FC Cincinnati",
+    "League": "usa.1",
+    "Logo": "https://a.espncdn.com/i/teamlogos/soccer/500/18267.png"
+  },
+  {
+    "Id": "185",
+    "Name": "FC Dallas",
+    "League": "usa.1",
+    "Logo": "https://a.espncdn.com/i/teamlogos/soccer/500/185.png"
+  },
+  {
+    "Id": "6077",
+    "Name": "Houston Dynamo FC",
+    "League": "usa.1",
+    "Logo": "https://a.espncdn.com/i/teamlogos/soccer/500/6077.png"
+  },
+  {
+    "Id": "20232",
+    "Name": "Inter Miami CF",
+    "League": "usa.1",
+    "Logo": "https://a.espncdn.com/i/teamlogos/soccer/500/20232.png"
+  },
+  {
+    "Id": "187",
+    "Name": "LA Galaxy",
+    "League": "usa.1",
+    "Logo": "https://a.espncdn.com/i/teamlogos/soccer/500/187.png"
+  },
+  {
+    "Id": "18966",
+    "Name": "LAFC",
+    "League": "usa.1",
+    "Logo": "https://a.espncdn.com/i/teamlogos/soccer/500/18966.png"
+  },
+  {
+    "Id": "17362",
+    "Name": "Minnesota United FC",
+    "League": "usa.1",
+    "Logo": "https://a.espncdn.com/i/teamlogos/soccer/500/17362.png"
+  },
+  {
+    "Id": "18986",
+    "Name": "Nashville SC",
+    "League": "usa.1",
+    "Logo": "https://a.espncdn.com/i/teamlogos/soccer/500/18986.png"
+  },
+  {
+    "Id": "189",
+    "Name": "New England Revolution",
+    "League": "usa.1",
+    "Logo": "https://a.espncdn.com/i/teamlogos/soccer/500/189.png"
+  },
+  {
+    "Id": "17606",
+    "Name": "New York City FC",
+    "League": "usa.1",
+    "Logo": "https://a.espncdn.com/i/teamlogos/soccer/500/17606.png"
+  },
+  {
+    "Id": "12011",
+    "Name": "Orlando City SC",
+    "League": "usa.1",
+    "Logo": "https://a.espncdn.com/i/teamlogos/soccer/500/12011.png"
+  },
+  {
+    "Id": "10739",
+    "Name": "Philadelphia Union",
+    "League": "usa.1",
+    "Logo": "https://a.espncdn.com/i/teamlogos/soccer/500/10739.png"
+  },
+  {
+    "Id": "9723",
+    "Name": "Portland Timbers",
+    "League": "usa.1",
+    "Logo": "https://a.espncdn.com/i/teamlogos/soccer/500/9723.png"
+  },
+  {
+    "Id": "4771",
+    "Name": "Real Salt Lake",
+    "League": "usa.1",
+    "Logo": "https://a.espncdn.com/i/teamlogos/soccer/500/4771.png"
+  },
+  {
+    "Id": "190",
+    "Name": "Red Bull New York",
+    "League": "usa.1",
+    "Logo": "https://a.espncdn.com/i/teamlogos/soccer/500/190.png"
+  },
+  {
+    "Id": "22529",
+    "Name": "San Diego FC",
+    "League": "usa.1",
+    "Logo": "https://a.espncdn.com/i/teamlogos/soccer/500/22529.png"
+  },
+  {
+    "Id": "191",
+    "Name": "San Jose Earthquakes",
+    "League": "usa.1",
+    "Logo": "https://a.espncdn.com/i/teamlogos/soccer/500/191.png"
+  },
+  {
+    "Id": "9726",
+    "Name": "Seattle Sounders FC",
+    "League": "usa.1",
+    "Logo": "https://a.espncdn.com/i/teamlogos/soccer/500/9726.png"
+  },
+  {
+    "Id": "186",
+    "Name": "Sporting Kansas City",
+    "League": "usa.1",
+    "Logo": "https://a.espncdn.com/i/teamlogos/soccer/500/186.png"
+  },
+  {
+    "Id": "21812",
+    "Name": "St. Louis CITY SC",
+    "League": "usa.1",
+    "Logo": "https://a.espncdn.com/i/teamlogos/soccer/500/21812.png"
+  },
+  {
+    "Id": "7318",
+    "Name": "Toronto FC",
+    "League": "usa.1",
+    "Logo": "https://a.espncdn.com/i/teamlogos/soccer/500/7318.png"
+  },
+  {
+    "Id": "9727",
+    "Name": "Vancouver Whitecaps",
+    "League": "usa.1",
+    "Logo": "https://a.espncdn.com/i/teamlogos/soccer/500/9727.png"
+  },
+  {
+    "Id": "2052",
+    "Name": "Beijing Guoan",
+    "League": "chn.1",
+    "Logo": "https://a.espncdn.com/i/teamlogos/soccer/500/2052.png"
+  },
+  {
+    "Id": "21355",
+    "Name": "Chengdu Rongcheng",
+    "League": "chn.1",
+    "Logo": "https://a.espncdn.com/i/teamlogos/soccer/500/21355.png"
+  },
+  {
+    "Id": "131704",
+    "Name": "Chongqing Tonglianglong",
+    "League": "chn.1",
+    "Logo": "https://a.espncdn.com/i/teamlogos/soccer/500/131704.png"
+  },
+  {
+    "Id": "22537",
+    "Name": "Dalian Yingbo",
+    "League": "chn.1",
+    "Logo": "https://a.espncdn.com/i/teamlogos/soccer/500/22537.png"
+  },
+  {
+    "Id": "8240",
+    "Name": "Henan",
+    "League": "chn.1",
+    "Logo": "https://a.espncdn.com/i/teamlogos/soccer/500/8240.png"
+  },
+  {
+    "Id": "131705",
+    "Name": "Liaoning Tieren",
+    "League": "chn.1",
+    "Logo": "https://a.espncdn.com/i/teamlogos/soccer/500/131705.png"
+  },
+  {
+    "Id": "21910",
+    "Name": "Qingdao Hainiu",
+    "League": "chn.1",
+    "Logo": "https://a.espncdn.com/i/teamlogos/soccer/500/21910.png"
+  },
+  {
+    "Id": "22198",
+    "Name": "Qingdao West Coast",
+    "League": "chn.1",
+    "Logo": "https://a.espncdn.com/i/teamlogos/soccer/500/22198.png"
+  },
+  {
+    "Id": "7521",
+    "Name": "Shandong Taishan",
+    "League": "chn.1",
+    "Logo": "https://a.espncdn.com/i/teamlogos/soccer/500/7521.png"
+  },
+  {
+    "Id": "15515",
+    "Name": "Shanghai Port FC",
+    "League": "chn.1",
+    "Logo": "https://a.espncdn.com/i/teamlogos/soccer/500/15515.png"
+  },
+  {
+    "Id": "977",
+    "Name": "Shanghai Shenhua FC",
+    "League": "chn.1",
+    "Logo": "https://a.espncdn.com/i/teamlogos/soccer/500/977.png"
+  },
+  {
+    "Id": "22199",
+    "Name": "Shenzhen Xinpengcheng",
+    "League": "chn.1",
+    "Logo": "https://a.espncdn.com/i/teamlogos/soccer/500/22199.png"
+  },
+  {
+    "Id": "8239",
+    "Name": "Tianjin Jinmen Tiger",
+    "League": "chn.1",
+    "Logo": "https://a.espncdn.com/i/teamlogos/soccer/500/8239.png"
+  },
+  {
+    "Id": "21506",
+    "Name": "Wuhan Three Towns",
+    "League": "chn.1",
+    "Logo": "https://a.espncdn.com/i/teamlogos/soccer/500/21506.png"
+  },
+  {
+    "Id": "22536",
+    "Name": "Yunnan Yukun",
+    "League": "chn.1",
+    "Logo": "https://a.espncdn.com/i/teamlogos/soccer/500/22536.png"
+  },
+  {
+    "Id": "18203",
+    "Name": "Zhejiang Professional FC",
+    "League": "chn.1",
+    "Logo": "https://a.espncdn.com/i/teamlogos/soccer/500/18203.png"
   }
 ]
